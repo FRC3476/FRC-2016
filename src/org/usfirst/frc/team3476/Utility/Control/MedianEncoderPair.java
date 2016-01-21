@@ -1,7 +1,6 @@
 package org.usfirst.frc.team3476.Utility.Control;
 
 import edu.wpi.first.wpilibj.PIDSource;
-import edu.wpi.first.wpilibj.PIDSourceType;
 
 public class MedianEncoderPair implements PIDSource
 {
@@ -55,10 +54,4 @@ public class MedianEncoderPair implements PIDSource
 			return 0;
 		}
 	}
-
-	@Override
-	public void setPIDSourceType(PIDSourceType pidSource){}
-
-	@Override
-	public PIDSourceType getPIDSourceType(){return null;}
 }

@@ -8,12 +8,22 @@ import org.usfirst.frc.team3476.Subsystems.StartSubsystem;
 
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+/**
+ * The main autonomous class.
+ * @author Anthony Demetrescu
+ *
+ */
 public class Main
 {
 	Parser par;
 	Subsystem[] systems;
 	boolean stop;
 	
+	/**
+	 * Constructs a auto Main object with the given year for constants, and the list of subsystems on the robot.
+	 * @param year the constants identifier
+	 * @param systemsin the array of robot systems on this robot
+	 */
 	public Main(String year, Subsystem[] systemsin)
 	{
 		par = new Parser(getScript(), getConstants(), year);
@@ -31,6 +41,9 @@ public class Main
 		passConstants();
 	}
 	
+	/**
+	 * Starts autonomous.
+	 */
 	public void start()
 	{
 		reset();
@@ -48,7 +61,7 @@ public class Main
 			{
 				if(stop)break;
 				done = true;
-				for (CommandBlock block : curCommands)//Go thru each CommandBlock on this line
+				for(CommandBlock block : curCommands)//Go thru each CommandBlock on this line
 				{
 					if(stop)break;
 					if(block.hasNext())//If there is another command, do things
@@ -74,16 +87,27 @@ public class Main
 		}
 	}
 	
+	/**
+	 * Returns the driver selected autonomous script.
+	 * @return the String representation of the script
+	 */
 	private String getScript()
 	{
 		return SmartDashboard.getString("java auto text");
 	}
 	
+	/**
+	 * Returns the constants files String.
+	 * @return the String representation of the constants files
+	 */
 	private String getConstants()
 	{
 		return SmartDashboard.getString("java constants");
 	}
 	
+	/**
+	 * Passes constants to all subsystems.
+	 */
 	public void passConstants()
 	{
 		for(Subsystem current : systems)
@@ -119,6 +143,11 @@ public class Main
 		}
 	}
 	
+	/**
+	 * Finds the first subsystem that the input command can apply to.
+	 * @param command the command to search for
+	 * @return the subsystem that can execute the command
+	 */
 	private Subsystem findSubsystem(Command command)
 	{
 		for(Subsystem toSearch : systems)
@@ -139,11 +168,18 @@ public class Main
 		return new ErrorSystem();
 	}
 	
+	/**
+	 * Sends the echo of the script back to the dashboard so that communications can be verified.
+	 */
 	public void sendCheckText()
 	{
 		SmartDashboard.putString("java check text", par.getScript());
 	}
 	
+	/**
+	 * Safely stops a subsystem Thread through the use of a gateway variable.
+	 * @param autoThread the Thread to stop
+	 */
 	public synchronized void stop(Thread autoThread)
 	{
 		stop = true;
@@ -154,7 +190,10 @@ public class Main
 		catch(InterruptedException e){}
 	}
 	
-	public synchronized void stopSubsystems(Thread autoThread)
+	/**
+	 * Calls stopThreads() on every subsystem to halt execution.
+	 */
+	public synchronized void stopSubsystems()
 	{
 		for(Subsystem sys: systems)
 		{
@@ -162,12 +201,19 @@ public class Main
 		}
 	}
 	
+	/**
+	 * Method used to ensure a certain state when starting auto.
+	 * Clears the robot drive.
+	 */
 	private synchronized void reset()
 	{
 		stop = false;
 		robotDriveClear();
 	}
 	
+	/**
+	 * Finds the drive subsystem and sets the drive values to zero to appease watchdog when auto is not running.
+	 */
 	public synchronized void robotDriveClear()
 	{
 		System.out.println("robotDriveClear");
@@ -182,6 +228,9 @@ public class Main
 		throw new NullPointerException("No drive subsystem found to appease watchdog.");
 	}
 	
+	/**
+	 * Updates the script and constants for the Parser so that it can parse the latest selected autonomous and get the latest constants.
+	 */
 	public void update()
 	{
 		par.update(getScript(), getConstants());

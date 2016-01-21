@@ -5,6 +5,13 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
+
+/**
+ * Parses a scriptable autonomous script with a constants file.
+ * @author Anthony Demetrescu
+ *
+ */
 public class Parser
 {
 	final String BACKUPCONSTANTS = "//Driving deadzones\nDRIVEDEAD = 2\nDRIVESTRAIGHTDEAD = 5\nTURNDEAD = 5\n\n//encoders\nUSELEFT = 1\nUSERIGHT = 1\n\n//Drivestraight PID\nSTRAIGHTP = 1.5\nSTRAIGHTI = 0\nSTRAIGHTD = 0.001\n\n//Drive PID\nDRIVEP = 1.3\nDRIVEI = 0.005\nDRIVED = 0\n\n//Turn PID\nTURNP = 1.7\nTURNI = 0.005\nTURND = 0\n\n//Intake constants\nSUCKMOTORSPEED = -1\nLOADMOTORSPEED = -1\nFORWARDISDOWN = 0 //false\nAIMUPPOWERED = 1 //true\n\n//Shooter constants\nSHOOTEROUTPUTRANGEHIGH = 1\nSHOOTEROUTPUTRANGELOW = -1\nSHOOTERIGAIN = 0.00001\nFLY1DIR = -1\nFLY2DIR = 1\nFLY3DIR = -1\nFLY4DIR = 1\nGRABFRISBEETIME = 0.65\nSHOOTFRISBEETIME = 0.33\nFLYWHEELDEAD = 100\nFLYWHEELMAXSPEED = 3000";
@@ -14,6 +21,12 @@ public class Parser
 	String constants;
 	String constantYear;
 	
+	/**
+	 * Constructor that takes a script, constants files String, and a year identifier String.
+	 * @param scriptin the autonomous script String
+	 * @param constantsin the constants file String
+	 * @param thisYear the year identifier String
+	 */
 	public Parser(String scriptin, String constantsin, String thisYear)
 	{
 		script = scriptin;
@@ -21,6 +34,10 @@ public class Parser
 		constants = retrieveThisYear(constantsin);
 	}
 	
+	/**
+	 * Returns the next line of the autonomous script.
+	 * @return the ArrayList of CommandBlocks that represent this line.
+	 */
 	public ArrayList<CommandBlock> nextLine()
 	{
 		if(script.equals(""))
@@ -43,15 +60,20 @@ public class Parser
 		}
 		
 		//Remove comments
-		int comdex = line.indexOf("//");
+		/*int comdex = line.indexOf("//");
 		if(comdex != -1)
 		{
 			line = line.substring(0, comdex);
 		}
+		//Obsolete code, here in case new code doesn't work
+		*/
+		
+		//Replacement code
+		line = line.split("//")[0];
 		
 		ArrayList<CommandBlock> lineCommands = new ArrayList<CommandBlock>();
 		
-		int semiIndex = line.indexOf(PARALLELSEPARATOR);
+		/*int semiIndex = line.indexOf(PARALLELSEPARATOR);
 		while(semiIndex != -1)//While there are still parallel commands to be processed, create command blocks
 		{
 			line = line.trim();
@@ -63,16 +85,31 @@ public class Parser
 			semiIndex = line.indexOf(PARALLELSEPARATOR);
 		}
 		lineCommands.add(parseCommandBlock(line));
+		//Obsolete code, here in case new code doesn't work
+		*/
+		
+		//Replacement code
+		for(String commandBlock : line.split(PARALLELSEPARATOR))
+		{
+			lineCommands.add(parseCommandBlock(commandBlock));
+		}
 		
 		return lineCommands;
 	}
 	
+	/**
+	 * Parses a String into a single CommandBlock.
+	 * Deals with whitespace in commandBlock.
+	 * Used by nextLine().
+	 * @param commandBlock the string to be parsed into a CommandBlock.
+	 * @return the CommandBlock representation of the input String
+	 */
 	private CommandBlock parseCommandBlock(String commandBlock)
 	{
 		commandBlock = commandBlock.trim();
 		ArrayList<Command> blockCommands = new ArrayList<Command>();
 		
-		int thendex = commandBlock.indexOf(THEN);
+		/*int thendex = commandBlock.indexOf(THEN);
 		while(thendex != -1)
 		{
 			commandBlock = commandBlock.trim();
@@ -83,11 +120,25 @@ public class Parser
 			
 			thendex = commandBlock.indexOf(THEN);
 		}
-		blockCommands.add(parseCommand(commandBlock));
+		//Obsolete code, here in case new code doesn't work
+		*/
+		
+		//Replacement code
+		for(String command : commandBlock.split(THEN))
+		{
+			blockCommands.add(parseCommand(command));
+		}
 		
 		return new CommandBlock(blockCommands);
 	}
 	
+	/**
+	 * Parses a String into a single Command.
+	 * Deals with whitespace in thenBlock.
+	 * Used by parseCommandBlock().
+	 * @param thenBlock the subunit String of a CommandBlock String
+	 * @return the Command representation of the input String
+	 */
 	private Command parseCommand(String thenBlock)
 	{
 		thenBlock = thenBlock.trim();
@@ -101,12 +152,12 @@ public class Parser
 			command = thenBlock.substring(0, colonIndex).trim();
 			if(atIndex != -1)//Is there an at?
 			{
-				colonParam = cleanDoubleParse(thenBlock.substring(colonIndex + 1, atIndex)); //Grab the stuff between the : and @ and parse
-				atParam = cleanDoubleParse(thenBlock.substring(atIndex + 1)); //Grab the stuff after the @ and parse
+				colonParam = OrangeUtility.cleanDoubleParse(thenBlock.substring(colonIndex + 1, atIndex)); //Grab the stuff between the : and @ and parse
+				atParam = OrangeUtility.cleanDoubleParse(thenBlock.substring(atIndex + 1)); //Grab the stuff after the @ and parse
 			}
 			else
 			{
-				colonParam = cleanDoubleParse(thenBlock.substring(colonIndex + 1)); //Grab the stuff after the : - no @
+				colonParam = OrangeUtility.cleanDoubleParse(thenBlock.substring(colonIndex + 1)); //Grab the stuff after the : - no @
 			}
 		}
 		else
@@ -121,6 +172,12 @@ public class Parser
 		return new Command(command, params);
 	}
 	
+	/**
+	 * Retrieves the constant value with the specified key from the constants file for the Parser's year.
+	 * @param key the key to search for
+	 * @return the value associated with the key
+	 * @throws IOException
+	 */
 	public double getConstant(String key) throws IOException
 	{
 		Matcher match = Pattern.compile("^" + key + "\\s*=", Pattern.MULTILINE).matcher(constants);
@@ -142,14 +199,19 @@ public class Parser
 			endOfLine = constants.length();
 		}
 		String sValue = constants.substring(keydex, endOfLine).trim();
-		return cleanDoubleParse(sValue);
+		return OrangeUtility.cleanDoubleParse(sValue);
 	}
 	
+	/**
+	 * Retrieves the constants file for the specified year.
+	 * @param constantsin the constants files String to be searched through
+	 * @return the constants file for the Parser's year
+	 */
 	private String retrieveThisYear(String constantsin)
 	{
 		ArrayList<String> years = new ArrayList<String>();
-		int sep = constantsin.indexOf(CONSTANTSSEPERATOR);
 		
+		/*int sep = constantsin.indexOf(CONSTANTSSEPERATOR);
 		while(sep != -1)
 		{
 			years.add(constantsin.substring(0, sep));
@@ -158,41 +220,60 @@ public class Parser
 			sep = constantsin.indexOf(CONSTANTSSEPERATOR);
 		}
 		years.add(constantsin);
+		//Obsolete code, here in case new code doesn't work
+		*/
+		
+		//Replacement code
+		for(String sep : constantsin.split(CONSTANTSSEPERATOR))
+		{
+			years.add(sep);
+		}
 		
 		for(String possYear : years)
 		{
-			if(possYear.substring(0, possYear.indexOf(YEARSEPERATOR)).trim().equals(constantYear))
+			String[] seperate = possYear.split(YEARSEPERATOR);
+			if(seperate[0].trim().equals(constantYear))
 			{
-				return possYear.substring(possYear.indexOf(YEARSEPERATOR) + 1);
+				return seperate[1];
 			}
 		}
 		System.out.println("USING BACKUP CONSTANTS!!!!!!!!!!!!!!");
 		return BACKUPCONSTANTS;
 	}
 	
-	private double cleanDoubleParse(String mess)
-	{
-		return Double.parseDouble(mess.replaceAll("[^\\d.-]", ""));
-	}
-	
+	/**
+	 * Checks if the script has another line.
+	 * @return True if the script has another line.
+	 */
 	public boolean hasNextLine()
 	{
 		return !script.equals("");
 	}
 	
+	/**
+	 * @return the script
+	 */
 	public String getScript()
 	{
 		return script;
 	}
 	
+	/**
+	 * @return the constants this parser is using
+	 */
 	public String getConstants()
 	{
 		return constants;
 	}
 	
+	/**
+	 * Updates the script and constants for this parser.
+	 * @param scriptin the new script
+	 * @param constantsin the new constants files
+	 */
 	public void update(String scriptin, String constantsin)
 	{
 		script = scriptin;
-		constants = constantsin;
+		constants = retrieveThisYear(constantsin);
 	}
 }
