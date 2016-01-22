@@ -46,5 +46,4 @@ public class SubsystemTask implements Runnable
 				}
 		}
 	}
-
 }

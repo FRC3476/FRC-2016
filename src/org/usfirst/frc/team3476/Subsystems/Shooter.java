@@ -2,43 +2,57 @@ package org.usfirst.frc.team3476.Subsystems;
 
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
+import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
 import org.usfirst.frc.team3476.Utility.Control.TakeBackHalf;
 
 import edu.wpi.first.wpilibj.Counter;
+import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PIDController;
-import edu.wpi.first.wpilibj.Solenoid;
+import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 
+//TODO: javadoc comments if not specified by Subsystem
+/*
+ * Represents the robot's shooter.
+ */
 public class Shooter implements Subsystem
 {
 	private final String[] autoCommands = {"shooter", "aim", "flywheel", "fire", "loader"};
-	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN", "FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETP", "TURRETI", "TURRETD"};
+	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN", "FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETP", "TURRETI", "TURRETD", "TURRETDEAD"};
 	private final double RPMTORPS = 60;
 	
-	enum Aim{UP, DOWN}
-	enum Load{IN, OUT}
+	enum AimMode{VISION, ENCODER}
+	AimMode aimmode;
 	
-	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD, FLYWHEELMAXSPEED, TURRETP, TURRETI, TURRETD;
+	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD, FLYWHEELMAXSPEED, TURRETP, TURRETI, TURRETD, TURRETDEAD;
+	private double aimangle;
 	private double[] FLYDIRS;
-	private boolean AIMUPPOWERED, flyDone, loadDone, firing, firingLast, pass1, turretdone;
+	private boolean flyDone, loadDone, firing, firingLast, pass1, turretdone;
 	private SpeedController fly1, fly2, turret;
 	private TakeBackHalf control;
 	private Counter tach;
 	private Timer shootingTimer;
 	
 	private PIDDashdataWrapper vision;
+	private Encoder encoder;
+	private PIDSource turretsource;
 	private PIDController turretcontrol;
 	
 	private SubsystemTask task;
 	private Thread flyThread;
 	
-	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController turret, Solenoid aimin, Solenoid loaderin, Counter tachin)
+	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController turretin, Counter tachin, Encoder encoderin)
 	{
-		vision = new PIDDashdataWrapper("Camera Data");
-		turretcontrol = new PIDController(TURRETP, TURRETI, TURRETD, vision, turret);
-		turretcontrol.enable();
+		//Turret setup
+		turret = turretin;
+		vision = new PIDDashdataWrapper(Data.VISIONX);
+		encoder = encoderin;
+		aimangle = 0;
+		turretsource = encoder;
+		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
 		turretdone = true;
+		aimmode = AimMode.ENCODER;
 		
 		fly1 = fly1in;
 		fly2 = fly2in;
@@ -69,23 +83,17 @@ public class Shooter implements Subsystem
 				flyDone = false;
 				
 				control.setSetpoint(params[1]);
-				aim(params[0] == 1 ? Aim.UP : Aim.DOWN);
 				break;
+			//TODO: use the actual aim method correctly
 			case "aim":
-				aim(params[0] == 1 ? Aim.UP : Aim.DOWN);
 				break;
 			case "flywheel":
 				flyDone = false;
 				
 				control.setSetpoint(params[0]);
 				break;
+			//TODO: do firing right
 			case "fire":
-				loadDone = false;
-				
-				startFire();
-				break;
-			case "loader":
-				loader(params[0] == 1 ? Load.OUT : Load.IN);
 				break;
 		}
 	}
@@ -106,37 +114,40 @@ public class Shooter implements Subsystem
 	public synchronized void returnConstantRequest(double[] constantsin)//Get all needed constants
 	{
 		int i = 0;
-		AIMUPPOWERED = constantsin[i] == 1 ? true : false;
-		i++;//1
 		SHOOTEROUTPUTRANGEHIGH = constantsin[i];
-		i++;//2
+		i++;//1
 		SHOOTEROUTPUTRANGELOW = constantsin[i];
-		i++;//3
+		i++;//2
 		SHOOTERIGAIN = constantsin[i];
+		i++;//3
+		FLYDIRS[i - 3] = constantsin[i];
 		i++;//4
-		FLYDIRS[i - 4] = constantsin[i];
+		FLYDIRS[i - 3] = constantsin[i];
 		i++;//5
-		FLYDIRS[i - 4] = constantsin[i];
-		i++;//6
-		FLYDIRS[i - 4] = constantsin[i];
-		i++;//7
-		FLYDIRS[i - 4] = constantsin[i];
-		i++;//8
-		GRABFRISBEETIME = constantsin[i];
-		i++;//9
-		SHOOTFRISBEETIME = constantsin[i];
-		i++;//10
 		FLYWHEELDEAD = constantsin[i];
-		i++;//11
+		i++;//6
 		FLYWHEELMAXSPEED = constantsin[i];
+		i++;//7
+		TURRETP = constantsin[i];
+		i++;//8
+		TURRETI = constantsin[i];
+		i++;//9
+		TURRETD = constantsin[i];
+		i++;//10
+		TURRETDEAD = constantsin[i];
 		
 		control = new TakeBackHalf(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW}, SHOOTERIGAIN, FLYWHEELMAXSPEED);
 		control.setSetpoint(0);
+		
+		turretcontrol = new PIDController(TURRETP, TURRETI, TURRETD, vision, turret);
+		turretcontrol.disable();
+		
 		startThreads();
 	}
 
+	//TODO: add firing logic
 	@Override
-	public synchronized void update()//Flywheel control loop
+	public synchronized void update()//Flywheel and turret control loop
 	{
 		//Take back half control
 		double output = 0;
@@ -156,36 +167,51 @@ public class Shooter implements Subsystem
 		//Turret update
 		if(!turretdone)
 		{
-			
+			switch(aimmode)
+			{
+				case VISION:
+					if(turretsource != vision)
+					{
+						turretsource = vision;
+					}
+					if(targetAvailable())
+					{
+						if(!turretcontrol.isEnabled())
+						{
+							turretcontrol.enable();
+						}
+						turretcontrol.setSetpoint(0);
+					}
+					else
+					{
+						turretcontrol.disable();
+					}
+					break;
+					
+				case ENCODER:
+					if(turretsource != encoder)
+					{
+						turretsource = encoder;
+					}
+					if(!turretcontrol.isEnabled())
+					{
+						turretcontrol.enable();
+					}
+					turretcontrol.setSetpoint(aimangle);
+					if(turretcontrol.onTarget())
+					{
+						turretdone = true;
+					}
+					break;
+			}
 		}
-		
-		//Shooter update
-		if(firing && !firingLast)//Starting firing sequence
+		else
 		{
-			shootingTimer.reset();
-			shootingTimer.start();
-			loader(Load.OUT);
-			pass1 = false;
+			turretcontrol.disable();
 		}
-		else if(firing && firingLast)//Update firing sequence
-		{
-			if(shootingTimer.get() > GRABFRISBEETIME && !pass1)
-		    {
-				shootingTimer.reset();
-		    	loader(Load.IN);
-		    	pass1 = true;
-		    }
-			if(shootingTimer.get() > SHOOTFRISBEETIME && pass1)
-		    {
-		    	shootingTimer.stop();
-		    	shootingTimer.reset();
-		    	firing = false;
-		    }
-		}
-		firingLast = firing;
 		
 		//Check if we're done here 
-		//TODO: Decide if we need to wait for the flywheel needs to be in the deadzone for multiple iterations
+		//TODO: Decide if the flywheel needs to be in the deadzone for multiple iterations
 		if(true /*Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD*/) flyDone = true;
 		if(!firing) loadDone = true;
 	}
@@ -200,20 +226,43 @@ public class Shooter implements Subsystem
 		return firing;
 	}
 	
-	public synchronized void aim(Aim dir)
+	/**
+	 * @return True if a vision target is available
+	 */
+	public synchronized boolean targetAvailable()
 	{
-		switch(dir)
-		{
-			case UP:
-				aim.set(AIMUPPOWERED ? true : false);
-				break;
-			case DOWN:
-				aim.set(AIMUPPOWERED ? false : true);
-				break;
-		}
+		return vision.pidGet() != Double.NaN;
 	}
 	
-	public synchronized void loader(Load dir)
+	/**
+	 * Aims the turret at the largest vision target.
+	 */
+	public synchronized void aim()
+	{
+		turretdone = false;
+	}
+	
+	/**
+	 * Aims the turret to the specified angle.
+	 */
+	public synchronized void aim(double angle)
+	{
+		turretdone = false;
+		aimangle = angle;
+	}
+	
+	/**
+	 * Stops the aiming for the turret.
+	 * In the case of encoder aiming, stops prematurely.
+	 * In the case of vision aiming, stops normally.
+	 */
+	public synchronized void stopAim()
+	{
+		turretdone = true;
+	}
+	
+	//TODO: do we need this?
+	/*public synchronized void loader(Load dir)
 	{
 		switch(dir)
 		{
@@ -229,7 +278,7 @@ public class Shooter implements Subsystem
 	public synchronized Load getLoader()
 	{
 		return loader.get() ? Load.OUT : Load.IN;
-	}
+	}*/
 	
 	public String toString()
 	{
@@ -262,11 +311,10 @@ public class Shooter implements Subsystem
 		}
 	}
 	
-	public void end()
+	public synchronized void end()
 	{
-		flyDone = false;
-		aim(Aim.DOWN);
-		loader(Load.IN);
+		flyDone = true;
+		turretdone = true;
 		control.setSetpoint(0);
 	}
 }

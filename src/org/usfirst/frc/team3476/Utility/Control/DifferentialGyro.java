@@ -2,11 +2,11 @@ package org.usfirst.frc.team3476.Utility.Control;
 
 import java.util.Arrays;
 
+import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.AnalogInput;
-import edu.wpi.first.wpilibj.Gyro;
 import edu.wpi.first.wpilibj.PIDSource;
 
-public class DifferentialGyro extends Gyro implements PIDSource
+public class DifferentialGyro extends AnalogGyro implements PIDSource
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;

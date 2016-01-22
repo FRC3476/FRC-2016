@@ -10,7 +10,6 @@ public class BangBang extends ControlLoop
 	@Override
 	protected double run(double process)
 	{
-		// TODO Auto-generated method stub
 		if(process < getSetpoint())
 		{
 			return Math.max(getOutputrange()[0], getOutputrange()[1]);

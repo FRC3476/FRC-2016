@@ -3,6 +3,7 @@ package org.usfirst.frc.team3476.Utility;
 import java.util.ArrayList;
 
 import edu.wpi.first.wpilibj.PIDSource;
+import edu.wpi.first.wpilibj.PIDSourceType;
 
 public class RunningAverage implements PIDSource
 {
@@ -53,4 +54,10 @@ public class RunningAverage implements PIDSource
 	{
 		return getAverage();
 	}
+
+	@Override
+	public void setPIDSourceType(PIDSourceType pidSource){}
+
+	@Override
+	public PIDSourceType getPIDSourceType(){return PIDSourceType.kDisplacement;}
 }

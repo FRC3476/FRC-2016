@@ -7,31 +7,49 @@ import edu.wpi.first.wpilibj.PIDSourceType;
 
 public class PIDDashdataWrapper implements PIDSource
 {
-	private String key;
+	public enum Data {VISIONX};
+	private Data type;
 	
-	public PIDDashdataWrapper(String keyin)
+	public PIDDashdataWrapper(Data typein)
 	{
-		key = keyin;
+		type = typein;
 	}
 	
+	@Override
+	public double pidGet()
+	{
+		switch(type)
+		{
+			//Returns only the x coordinate
+			case VISIONX:
+				boolean found = false;
+				double[] max = {0, 0, 0};
+				for(double[] target : Dashcomm.getTargetData())
+				{
+					if(target[2] > max[2])
+					{
+						found = true;
+						max = target;
+					}
+				}
+				if(!found)
+				{
+					return Double.NaN;
+				}
+				else
+				{
+					return max[0];
+				}
+				
+			default:
+				return 0;
+		}
+	}
+
 	@Override
 	public void setPIDSourceType(PIDSourceType pidSource){}
 
 	@Override
-	public PIDSourceType getPIDSourceType(){return null;}
-
-	@Override
-	public double pidGet()
-	{
-		double[] max = {0, 0, 0};
-		for(double[] target : Dashcomm.getTargetData(key))
-		{
-			if(target[2] > max[2])
-			{
-				max = target;
-			}
-		}
-		return max[0];
-	}
+	public PIDSourceType getPIDSourceType(){return PIDSourceType.kDisplacement;}
 
 }

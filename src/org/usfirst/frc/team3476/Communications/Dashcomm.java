@@ -6,15 +6,25 @@ import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
+/**
+ * Parses SmartDashboard data into usable form for the robot.
+ * @author Anthony Demetrescu
+ *
+ */
 public class Dashcomm
 {
 
 public static final String TARGETDELIMITER = "\t", DATADELIMETER = " ";
+public static final String TARGETINGKEY = "Camera Data";
 
-	public static double[][] getTargetData(String key)
+	/**
+	 * Retrieves the data from vision processing about target locations.
+	 * @return the array containing targets and their associated values (indexed as: [target][XPOS, YPOS, AREA])
+	 */
+	public static double[][] getTargetData()
 	{
 		ArrayList<Double[]> result = new ArrayList<Double[]>();
-		String stringData = SmartDashboard.getString(key);
+		String stringData = SmartDashboard.getString(TARGETINGKEY);
 		String[] targets = stringData.split(TARGETDELIMITER);
 		for(String target : targets)
 		{
