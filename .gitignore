@@ -1,1 +1,5 @@
-/bin
+*.class
+/build/
+/bin/
+/dist/
+/.git/

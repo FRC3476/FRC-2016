@@ -3,10 +3,10 @@ package org.usfirst.frc.team3476.ScriptableAuto;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.*;
 import org.usfirst.frc.team3476.Subsystems.StartSubsystem;
 
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 /**
  * The main autonomous class.
@@ -56,7 +56,7 @@ public class Main
 			if(stop)break;
 			done = false;
 			curCommands = par.nextLine();
-			SmartDashboard.putString("command", "" + curCommands);
+			Dashcomm.putString("command", "" + curCommands);
 			while (!done)//Keep going until line is done (ArrayList is empty)
 			{
 				if(stop)break;
@@ -93,7 +93,7 @@ public class Main
 	 */
 	private String getScript()
 	{
-		return SmartDashboard.getString("java auto text");
+		return Dashcomm.getString("java auto text", "");
 	}
 	
 	/**
@@ -102,7 +102,7 @@ public class Main
 	 */
 	private String getConstants()
 	{
-		return SmartDashboard.getString("java constants");
+		return Dashcomm.getString("java constants", "");
 	}
 	
 	/**
@@ -173,7 +173,7 @@ public class Main
 	 */
 	public void sendCheckText()
 	{
-		SmartDashboard.putString("java check text", par.getScript());
+		Dashcomm.putString("java check text", par.getScript());
 	}
 	
 	/**
@@ -216,7 +216,7 @@ public class Main
 	 */
 	public synchronized void robotDriveClear()
 	{
-		System.out.println("robotDriveClear");
+		//System.out.println("robotDriveClear");
 		for(Subsystem sys : systems)
 		{
 			if(sys.toString().toLowerCase().indexOf("drive") != -1)

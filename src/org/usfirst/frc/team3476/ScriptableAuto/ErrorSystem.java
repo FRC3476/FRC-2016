@@ -39,4 +39,7 @@ public class ErrorSystem implements Subsystem
 
 	@Override
 	public void end() {}
+	
+	@Override
+	public boolean threadsActive(){return false;}
 }

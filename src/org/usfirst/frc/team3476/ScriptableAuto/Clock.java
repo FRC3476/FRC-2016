@@ -118,4 +118,10 @@ public class Clock implements Subsystem
 			if(sys != null) sys.end();
 		}
 	}
+	
+	@Override
+	public boolean threadsActive()
+	{
+		return task.isActive();
+	}
 }

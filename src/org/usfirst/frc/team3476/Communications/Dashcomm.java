@@ -1,13 +1,9 @@
 package org.usfirst.frc.team3476.Communications;
 
-import java.util.ArrayList;
-
-import org.usfirst.frc.team3476.Utility.OrangeUtility;
-
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 /**
- * Parses SmartDashboard data into usable form for the robot.
+ * Parses NetworkTables data into usable form for the robot.
  * @author Anthony Demetrescu
  *
  */
@@ -15,7 +11,8 @@ public class Dashcomm
 {
 
 public static final String TARGETDELIMITER = "\t", DATADELIMETER = " ";
-public static final String TARGETINGKEY = "Camera Data";
+public static final String TARGETINGKEY = "data/camera data";
+public static final int NUMDATAPIECES = 3;
 
 	/**
 	 * Retrieves the data from vision processing about target locations.
@@ -23,29 +20,140 @@ public static final String TARGETINGKEY = "Camera Data";
 	 */
 	public static double[][] getTargetData()
 	{
-		ArrayList<Double[]> result = new ArrayList<Double[]>();
-		String stringData = SmartDashboard.getString(TARGETINGKEY);
-		String[] targets = stringData.split(TARGETDELIMITER);
-		for(String target : targets)
+		double[] rawData = getNumberArray(TARGETINGKEY, new double[]{Double.NaN, Double.NaN, Double.NaN});
+		double[][] result = new double[][]{{Double.NaN, Double.NaN, Double.NaN}};
+		for(int i = 0; i < rawData.length; i++)
 		{
-			String[] manyData = target.split(DATADELIMETER);
-			ArrayList<Double> targetData = new ArrayList<Double>();
-			for(String dataPiece : manyData)
+			for(int j = 0; j < NUMDATAPIECES; j++)
 			{
-				double data = OrangeUtility.cleanDoubleParse(dataPiece);
-				targetData.add(data);
-			}
-			result.add((Double[])targetData.toArray());
-		}
-		Double[][] objtemp = (Double[][])result.toArray();
-		double[][] pritemp = new double[objtemp.length][objtemp[0].length];
-		for(int i = 0; i < objtemp.length; i++)
-		{
-			for(int j = 0; j < objtemp[i].length; j++)
-			{
-				pritemp[i][j] = objtemp[i][j];
+				result[i][j] = rawData[3*i + j];
 			}
 		}
-		return pritemp;
+		return result;
+	}
+	
+	//*******************************
+	//************GETTERS************
+	//*******************************
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed double value, if available
+	 */
+	public static double getNumber(String keypath, double defaultvalue)
+	{
+		return NetworkTable.getTable("").getNumber(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed double[] value, if available
+	 */
+	public static double[] getNumberArray(String keypath, double[] defaultvalue)
+	{
+		return NetworkTable.getTable("").getNumberArray(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed boolean value, if available
+	 */
+	public static boolean getBoolean(String keypath, boolean defaultvalue)
+	{
+		return NetworkTable.getTable("").getBoolean(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed boolean[] value, if available
+	 */
+	public static boolean[] getBooleanArray(String keypath, boolean[] defaultvalue)
+	{
+		return NetworkTable.getTable("").getBooleanArray(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed String value, if available
+	 */
+	public static String getString(String keypath, String defaultvalue)
+	{
+		return NetworkTable.getTable("").getString(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed String[] value, if available
+	 */
+	public static String[] getStringArray(String keypath, String[] defaultvalue)
+	{
+		return NetworkTable.getTable("").getStringArray(keypath, defaultvalue);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param defaultvalue the default value if no keyed value is available
+	 * @return the keyed Object[] value, if available
+	 */
+	public static Object getValue(String keypath, Object defaultvalue)
+	{
+		return NetworkTable.getTable("").getValue(keypath, defaultvalue);
+	}
+	
+	//*******************************
+	//************PUTTERS************
+	//*******************************
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param value the double value to put
+	 */
+	public static void putNumber(String keypath, double value)
+	{
+		NetworkTable.getTable("").putNumber(keypath, value);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param value the double value to put
+	 */
+	public static void putNumberArray(String keypath, double[] value)
+	{
+		NetworkTable.getTable("").putNumberArray(keypath, value);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param value the double value to put
+	 */
+	public static void putString(String keypath, String value)
+	{
+		NetworkTable.getTable("").putString(keypath, value);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key
+	 * @param value the double value to put
+	 */
+	public static void putStringArray(String keypath, String[] value)
+	{
+		NetworkTable.getTable("").putStringArray(keypath, value);
 	}
 }

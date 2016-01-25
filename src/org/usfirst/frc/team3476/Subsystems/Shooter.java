@@ -50,7 +50,6 @@ public class Shooter implements Subsystem
 		encoder = encoderin;
 		aimangle = 0;
 		turretsource = encoder;
-		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
 		turretdone = true;
 		aimmode = AimMode.ENCODER;
 		
@@ -141,6 +140,7 @@ public class Shooter implements Subsystem
 		
 		turretcontrol = new PIDController(TURRETP, TURRETI, TURRETD, vision, turret);
 		turretcontrol.disable();
+		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
 		
 		startThreads();
 	}
@@ -316,5 +316,11 @@ public class Shooter implements Subsystem
 		flyDone = true;
 		turretdone = true;
 		control.setSetpoint(0);
+	}
+	
+	@Override
+	public boolean threadsActive()
+	{
+		return task.isActive();
 	}
 }

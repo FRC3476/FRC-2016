@@ -55,6 +55,11 @@ public interface Subsystem
 	void startThreads();
 	
 	/**
+	 * @return True if Threads are active
+	 */
+	boolean threadsActive();
+	
+	/**
 	 * Ends all Threads.
 	 */
 	void terminateThreads();

@@ -6,7 +6,7 @@ public class StartSubsystem
 {
 	public static void init(Subsystem robotDriveSystem)
 	{
-		System.out.println("init");
+		//System.out.println("init");
 		for(String command : robotDriveSystem.getAutoCommands())
 		{
 			if(command.toLowerCase().indexOf("clear") != -1)

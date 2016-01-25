@@ -29,6 +29,11 @@ public class SubsystemTask implements Runnable
 		action = true;
 	}
 	
+	public synchronized boolean isActive()
+	{
+		return action;
+	}
+	
 	@Override
 	public void run()
 	{

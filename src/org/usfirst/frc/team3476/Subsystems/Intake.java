@@ -177,4 +177,10 @@ public class Intake implements Subsystem
 		dropdown.set(0);
 		escalator.set(0);
 	}
+	
+	@Override
+	public boolean threadsActive()
+	{
+		return task.isActive();
+	}
 }
