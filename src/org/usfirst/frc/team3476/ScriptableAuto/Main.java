@@ -7,7 +7,6 @@ import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.*;
 import org.usfirst.frc.team3476.Subsystems.StartSubsystem;
 
-
 /**
  * The main autonomous class.
  * @author Anthony Demetrescu
@@ -18,22 +17,34 @@ public class Main
 	Parser par;
 	Subsystem[] systems;
 	boolean stop;
+	AutoTask auto;
+	Thread autoThread;
 	
 	/**
 	 * Constructs a auto Main object with the given year for constants, and the list of subsystems on the robot.
+	 * No NT or connection required side effects.
 	 * @param year the constants identifier
 	 * @param systemsin the array of robot systems on this robot
 	 */
 	public Main(String year, Subsystem[] systemsin)
 	{
-		par = new Parser(getScript(), getConstants(), year);
 		systems = systemsin;
+		par = new Parser(getScript(), getConstants(), year);
 		sendCheckText();
 		passConstants();
 		stop = false;
+		
+		auto = new AutoTask(this);
+		autoThread = new Thread(auto, "autoThread");
 	}
 	
-	//Testing constructor
+	/**
+	 * Testing constructor. Not for robot use.
+	 * @param year the constants identifier
+	 * @param systemsin the array of robot systems on this robot
+	 * @param script the test script String to use
+	 * @param constants the constants String to use
+	 */
 	public Main(String year, Subsystem[] systemsin, String script, String constants)
 	{
 		par = new Parser(script, constants, year);
@@ -42,9 +53,17 @@ public class Main
 	}
 	
 	/**
-	 * Starts autonomous.
+	 * Starts the autonomous thread.
 	 */
-	public void start()
+	public void startThread()
+	{
+		autoThread.start();//This thread calls start in Main
+	}
+	
+	/**
+	 * Starts autonomous. Called by the auto Thread only.
+	 */
+	private void start()
 	{
 		reset();
 		ArrayList<CommandBlock> curCommands;
@@ -169,7 +188,7 @@ public class Main
 	}
 	
 	/**
-	 * Sends the echo of the script back to the dashboard so that communications can be verified.
+	 * Sends the echo of the script back to the Dashboard so that communications can be verified.
 	 */
 	public void sendCheckText()
 	{
@@ -177,10 +196,10 @@ public class Main
 	}
 	
 	/**
-	 * Safely stops a subsystem Thread through the use of a gateway variable.
+	 * Safely stops the auto Thread through the use of a gateway variable. This method will only return when the Thread has stopped.
 	 * @param autoThread the Thread to stop
 	 */
-	public synchronized void stop(Thread autoThread)
+	public synchronized void stop()
 	{
 		stop = true;
 		try
@@ -198,6 +217,17 @@ public class Main
 		for(Subsystem sys: systems)
 		{
 			sys.stopThreads();
+		}
+	}
+	
+	/**
+	 * Calls startThreads() on every subsystem to resume execution.
+	 */
+	public synchronized void startSubsystems()
+	{
+		for(Subsystem sys: systems)
+		{
+			sys.startThreads();
 		}
 	}
 	
@@ -231,8 +261,30 @@ public class Main
 	/**
 	 * Updates the script and constants for the Parser so that it can parse the latest selected autonomous and get the latest constants.
 	 */
-	public void update()
+	public void updateData()
 	{
 		par.update(getScript(), getConstants());
+		passConstants();
+		sendCheckText();
 	}
+	
+	/**
+	 * The task that runs autonomous.
+	 * @author Anthony Demetrescu
+	 *
+	 */
+	private class AutoTask implements Runnable
+    {
+		Main automain;
+		public AutoTask(Main automainin)
+		{
+			automain = automainin;
+		}
+		
+		@Override
+		public void run()
+		{
+			automain.start();
+		}
+    }
 }

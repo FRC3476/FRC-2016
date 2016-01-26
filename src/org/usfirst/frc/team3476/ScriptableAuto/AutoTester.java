@@ -15,6 +15,6 @@ public class AutoTester
 		
 		Main main = new Main("2016", systems, script, constants);
 		
-		main.start();
+		main.startThread();
 	}
 }

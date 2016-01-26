@@ -244,6 +244,7 @@ public class Shooter implements Subsystem
 	
 	/**
 	 * Aims the turret to the specified angle.
+	 * @param angle the angle to turn to
 	 */
 	public synchronized void aim(double angle)
 	{
