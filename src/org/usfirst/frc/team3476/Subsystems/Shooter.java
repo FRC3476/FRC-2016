@@ -1,6 +1,7 @@
 package org.usfirst.frc.team3476.Subsystems;
 
 import org.usfirst.frc.team3476.Main.Subsystem;
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
 import org.usfirst.frc.team3476.Utility.Control.TakeBackHalf;
@@ -42,6 +43,8 @@ public class Shooter implements Subsystem
 	private SubsystemTask task;
 	private Thread flyThread;
 	
+	private int iters;
+	
 	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController turretin, Counter tachin, Encoder encoderin)
 	{
 		//Turret setup
@@ -52,6 +55,9 @@ public class Shooter implements Subsystem
 		turretsource = encoder;
 		turretdone = true;
 		aimmode = AimMode.ENCODER;
+		turretcontrol = new PIDController(0, 0, 0, vision, turret);
+		turretcontrol.disable();
+		turretcontrol.setOutputRange(-0.25, 0.25);
 		
 		fly1 = fly1in;
 		fly2 = fly2in;
@@ -62,6 +68,7 @@ public class Shooter implements Subsystem
 		shootingTimer = new Timer();
 		FLYDIRS = new double[2];
 		
+		iters = 0;
 		task = new SubsystemTask(this);
 		flyThread = new Thread(task, "flyThread");
 		flyThread.start();
@@ -135,11 +142,12 @@ public class Shooter implements Subsystem
 		i++;//10
 		TURRETDEAD = constantsin[i];
 		
+		
 		control = new TakeBackHalf(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW}, SHOOTERIGAIN, FLYWHEELMAXSPEED);
 		control.setSetpoint(0);
 		
-		turretcontrol = new PIDController(TURRETP, TURRETI, TURRETD, vision, turret);
-		turretcontrol.disable();
+		turretcontrol.setPID(TURRETP, TURRETI, TURRETD);
+		//System.out.println("Setting PID");
 		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
 		
 		startThreads();
@@ -160,9 +168,9 @@ public class Shooter implements Subsystem
 		{
 			output = control.output(process);
 		}*/
-		output = control.getSetpoint() > 0 ? 1 : 0;
-		fly1.set(output*FLYDIRS[0]);
-		fly2.set(output*FLYDIRS[1]);
+		//output = control.getSetpoint() > 0 ? 1 : 0;
+		//fly1.set(output*FLYDIRS[0]);
+		//fly2.set(output*FLYDIRS[1]);
 		
 		//Turret update
 		if(!turretdone)
@@ -176,6 +184,7 @@ public class Shooter implements Subsystem
 					}
 					if(targetAvailable())
 					{
+						if(iters % 5 == 0) System.out.println(OrangeUtility.PIDData(turretcontrol));
 						if(!turretcontrol.isEnabled())
 						{
 							turretcontrol.enable();
@@ -214,6 +223,7 @@ public class Shooter implements Subsystem
 		//TODO: Decide if the flywheel needs to be in the deadzone for multiple iterations
 		if(true /*Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD*/) flyDone = true;
 		if(!firing) loadDone = true;
+		iters++;
 	}
 	
 	public synchronized void startFire()
@@ -240,6 +250,7 @@ public class Shooter implements Subsystem
 	public synchronized void aim()
 	{
 		turretdone = false;
+		aimmode = AimMode.VISION;
 	}
 	
 	/**
@@ -250,6 +261,7 @@ public class Shooter implements Subsystem
 	{
 		turretdone = false;
 		aimangle = angle;
+		aimmode = AimMode.ENCODER;
 	}
 	
 	/**

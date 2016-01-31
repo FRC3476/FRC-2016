@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Utility;
 
+import edu.wpi.first.wpilibj.PIDController;
+
 public class OrangeUtility
 {
 	/**
@@ -62,5 +64,20 @@ public class OrangeUtility
 	public static double cleanDoubleParse(String mess)
 	{
 		return Double.parseDouble(mess.replaceAll("[^\\d.-]", ""));
+	}
+	
+	/**
+	 * Returns a string with all the parameters of the passed PID.
+	 * @param control the PIDController to get info from.
+	 * @return the info of the PIDController.
+	 */
+	public static String PIDData(PIDController control)
+	{
+		String ret = "Enable: " + control.isEnabled();
+		ret += ",\nError: " + control.getError();
+		ret += ",\nCurrent: " + (control.getSetpoint() + control.getError());
+		ret += ",\nControl Value: " + control.get();
+		ret += "\n";
+		return ret;
 	}
 }

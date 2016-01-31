@@ -187,6 +187,7 @@ public class Parser
 		if(keydex == -1)
 		{
 			System.out.println("Match not found for key " + key);
+			throw new IOException("test");
 			//throw new IOException("Missing key \"" + key + "\" in constants file: \"" + constantYear + "\"\nConstants in use: \"" + constants + "\"");
 		}
 //		if(equals == -1)

@@ -22,24 +22,8 @@ public class PIDDashdataWrapper implements PIDSource
 		{
 			//Returns only the x coordinate
 			case VISIONX:
-				boolean found = false;
-				double[] max = {0, 0, 0};
-				for(double[] target : Dashcomm.getTargetData())
-				{
-					if(target[2] > max[2])
-					{
-						found = true;
-						max = target;
-					}
-				}
-				if(!found)
-				{
-					return Double.NaN;
-				}
-				else
-				{
-					return max[0];
-				}
+				double[][] data = Dashcomm.getTargetData();//[target][Dist,X,Y]
+				return data[0][1];
 				
 			default:
 				return 0;

@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Communications;
 
+import java.util.Arrays;
+
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 /**
@@ -11,7 +13,7 @@ public class Dashcomm
 {
 
 public static final String TARGETDELIMITER = "\t", DATADELIMETER = " ";
-public static final String TARGETINGKEY = "data/camera data";
+public static final String TARGETINGKEY = "data/camera";
 public static final int NUMDATAPIECES = 3;
 
 	/**
@@ -21,8 +23,13 @@ public static final int NUMDATAPIECES = 3;
 	public static double[][] getTargetData()
 	{
 		double[] rawData = getNumberArray(TARGETINGKEY, new double[]{Double.NaN, Double.NaN, Double.NaN});
-		double[][] result = new double[][]{{Double.NaN, Double.NaN, Double.NaN}};
-		for(int i = 0; i < rawData.length; i++)
+		//System.out.println("RawData: " + Arrays.toString(rawData));
+		if(rawData.length == 0)
+			return new double[][]{{Double.NaN, Double.NaN, Double.NaN}};
+		int numtargets = rawData.length/3;
+		
+		double[][] result = new double[numtargets][NUMDATAPIECES];
+		for(int i = 0; i < numtargets; i++)
 		{
 			for(int j = 0; j < NUMDATAPIECES; j++)
 			{
@@ -31,14 +38,14 @@ public static final int NUMDATAPIECES = 3;
 		}
 		return result;
 	}
-	
+		
 	//*******************************
 	//************GETTERS************
 	//*******************************
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed double value, if available
 	 */
@@ -49,7 +56,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed double[] value, if available
 	 */
@@ -60,7 +67,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed boolean value, if available
 	 */
@@ -71,7 +78,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed boolean[] value, if available
 	 */
@@ -82,7 +89,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed String value, if available
 	 */
@@ -93,7 +100,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed String[] value, if available
 	 */
@@ -104,7 +111,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed Object[] value, if available
 	 */
@@ -119,7 +126,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double value to put
 	 */
 	public static void putNumber(String keypath, double value)
@@ -129,7 +136,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double value to put
 	 */
 	public static void putNumberArray(String keypath, double[] value)
@@ -139,7 +146,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double value to put
 	 */
 	public static void putString(String keypath, String value)
@@ -149,7 +156,7 @@ public static final int NUMDATAPIECES = 3;
 	
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
-	 * @param keypath the path to the value including the key
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double value to put
 	 */
 	public static void putStringArray(String keypath, String[] value)

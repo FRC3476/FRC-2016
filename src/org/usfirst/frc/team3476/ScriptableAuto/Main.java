@@ -21,22 +21,9 @@ public class Main
 	Thread autoThread;
 	
 	/**
-	 * Constructs a auto Main object with the given year for constants, and the list of subsystems on the robot.
-	 * No NT or connection required side effects.
-	 * @param year the constants identifier
-	 * @param systemsin the array of robot systems on this robot
+	 * Constructs an auto Main object.
 	 */
-	public Main(String year, Subsystem[] systemsin)
-	{
-		systems = systemsin;
-		par = new Parser(getScript(), getConstants(), year);
-		sendCheckText();
-		passConstants();
-		stop = false;
-		
-		auto = new AutoTask(this);
-		autoThread = new Thread(auto, "autoThread");
-	}
+	public Main(){}
 	
 	/**
 	 * Testing constructor. Not for robot use.
@@ -53,10 +40,31 @@ public class Main
 	}
 	
 	/**
+	 * Initializes this Main with the given year for constants, and the list of subsystems on the robot.
+	 * No NT or connection required side effects.
+	 * @param year the constants identifier
+	 * @param systemsin the array of robot systems on this robot
+	 */
+	public void initialize(String year, Subsystem[] systemsin)
+	{
+		systems = systemsin;
+		par = new Parser(getScript(), getConstants(), year);
+		sendCheckText();
+		passConstants();
+		stop = false;
+		
+		auto = new AutoTask(this);
+		autoThread = new Thread(auto, "autoThread");
+	}
+	
+	/**
 	 * Starts the autonomous thread.
 	 */
 	public void startThread()
 	{
+		stop = false;
+		if(autoThread.getState() != Thread.State.NEW)
+			autoThread = new Thread(auto, "autoThread");
 		autoThread.start();//This thread calls start in Main
 	}
 	
@@ -112,7 +120,7 @@ public class Main
 	 */
 	private String getScript()
 	{
-		return Dashcomm.getString("java auto text", "");
+		return Dashcomm.getString("auto/java auto text", "no auto text");
 	}
 	
 	/**
@@ -121,7 +129,7 @@ public class Main
 	 */
 	private String getConstants()
 	{
-		return Dashcomm.getString("java constants", "");
+		return Dashcomm.getString("auto/java constants", "no constants");
 	}
 	
 	/**
@@ -192,7 +200,7 @@ public class Main
 	 */
 	public void sendCheckText()
 	{
-		Dashcomm.putString("java check text", par.getScript());
+		Dashcomm.putString("/auto/java check text", par.getScript());
 	}
 	
 	/**
@@ -216,7 +224,10 @@ public class Main
 	{
 		for(Subsystem sys: systems)
 		{
-			sys.stopThreads();
+			if(sys != null)
+			{
+				sys.stopThreads();
+			}
 		}
 	}
 	
@@ -227,7 +238,10 @@ public class Main
 	{
 		for(Subsystem sys: systems)
 		{
-			sys.startThreads();
+			if(sys != null)
+			{
+				sys.startThreads();
+			}
 		}
 	}
 	
@@ -249,10 +263,13 @@ public class Main
 		//System.out.println("robotDriveClear");
 		for(Subsystem sys : systems)
 		{
-			if(sys.toString().toLowerCase().indexOf("drive") != -1)
+			if(sys != null)
 			{
-				StartSubsystem.init(sys);
-				return;
+				if(sys.toString().toLowerCase().indexOf("drive") != -1)
+				{
+					StartSubsystem.init(sys);
+					return;
+				}
 			}
 		}
 		throw new NullPointerException("No drive subsystem found to appease watchdog.");

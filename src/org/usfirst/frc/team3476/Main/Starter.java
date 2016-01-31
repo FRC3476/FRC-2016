@@ -16,10 +16,12 @@ public class Starter extends SafeTask
     public Starter(Main main_in, String yearin, Subsystem[] systemsin)
     {
     	main = main_in;
+    	year = yearin;
+    	systems = systemsin;
     }
     
 	@Override
-	protected void action() 
+	protected synchronized void action()
 	{
 		if(!flushed)
 		{
@@ -32,7 +34,8 @@ public class Starter extends SafeTask
 		}
 		else if(!mainInitd)
 		{
-			main = new Main(year, systems);
+			main.initialize(year, systems);
+			mainInitd = true;
 		}
 		else if(!cameradone)
 		{
@@ -41,11 +44,12 @@ public class Starter extends SafeTask
 		}
 		else
 		{
+			System.out.println("STARTER DONE");
 			super.terminate();
 		}
 	}
 	
-	public boolean importantDone()
+	public synchronized boolean importantDone()
 	{
 		return flushed && NTready && mainInitd;
 	}
@@ -62,6 +66,7 @@ public class Starter extends SafeTask
     {
     	OrangeCamera cam = new OrangeCamera("axis-camera.local");
     	cam.writeExposureControl(ExposureControl.kHold);
+    	cam.writeBrightness(0);
     	cam.writeExposure(0);
     }
 }
