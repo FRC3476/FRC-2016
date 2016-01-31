@@ -33,7 +33,7 @@ public class Intake implements Subsystem
 		started = true;
 		done = true;
 		
-		task = new SubsystemTask(this);
+		task = new SubsystemTask(this, 10);
 		ddThread = new Thread(task, "ddThread");
 		ddThread.start();
 	}

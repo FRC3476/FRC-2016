@@ -18,7 +18,7 @@ public class Clock implements Subsystem
 		time = 1;
 		
 		systems = systemsin;
-		task = new SubsystemTask(this);
+		task = new SubsystemTask(this, 10);
 		clockThread = new Thread(task, "Clock");
 		clockThread.start();
 	}

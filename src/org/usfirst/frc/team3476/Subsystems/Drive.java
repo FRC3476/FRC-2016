@@ -91,7 +91,7 @@ public class Drive implements Subsystem
 		
 		driven = new BangBang(new double[]{1, -1});
 		
-		task = new SubsystemTask(this);
+		task = new SubsystemTask(this, 10);
 		driveThread = new Thread(task, "driveThread");
 		driveThread.start();
 	}

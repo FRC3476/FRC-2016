@@ -1,15 +1,18 @@
 package org.usfirst.frc.team3476.Main;
 
 import org.usfirst.frc.team3476.Main.SafeTask;
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 public abstract class SafeTask implements Runnable
 {
 	private boolean running, action;
+	private int executionTime = 10;
 	
-	public SafeTask()
+	public SafeTask(int minTime)
 	{
 		running = true;
 		action = false;
+		executionTime = minTime;
 	}
 	
 	/**
@@ -50,18 +53,21 @@ public abstract class SafeTask implements Runnable
 	 */
 	public void run()
 	{
+		long time;
 		while(running)
 		{
-			if(action) action();
+			if(action)
+			{
+				time = System.currentTimeMillis();
+				action();
+				time = System.currentTimeMillis() - time;
+				if(time < executionTime)
+				{
+					OrangeUtility.sleep(executionTime - time);
+				}
+			}
 			else
-				try
-				{
-					Thread.sleep(50);
-				}
-				catch (InterruptedException e)
-				{
-					e.printStackTrace();
-				}
+				OrangeUtility.sleep(50);
 		}
 	}
 	

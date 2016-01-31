@@ -13,8 +13,9 @@ public class Starter extends SafeTask
     private String year;
 	private Subsystem[] systems;
 	
-    public Starter(Main main_in, String yearin, Subsystem[] systemsin)
+    public Starter(Main main_in, String yearin, Subsystem[] systemsin, int minTime)
     {
+    	super(minTime);
     	main = main_in;
     	year = yearin;
     	systems = systemsin;

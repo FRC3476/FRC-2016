@@ -69,7 +69,7 @@ public class Shooter implements Subsystem
 		FLYDIRS = new double[2];
 		
 		iters = 0;
-		task = new SubsystemTask(this);
+		task = new SubsystemTask(this, 10);
 		flyThread = new Thread(task, "flyThread");
 		flyThread.start();
 	}

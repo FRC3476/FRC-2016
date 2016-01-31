@@ -112,7 +112,7 @@ public class Robot extends IterativeRobot
 		systems[0] = new Drive(leftDrive, rightDrive, gyro, drive, shifterSoleniod);
 		systems[1] = new Shooter(flyTalon1, flyTalon2, turretTalon, tach, turretenc);
 		main = new Main();
-		starter = new Starter(main, "2016", systems);
+		starter = new Starter(main, "2016", systems, 0);
 		starterThread = new Thread(starter);
 		starter.resume();
 		starterThread.start();

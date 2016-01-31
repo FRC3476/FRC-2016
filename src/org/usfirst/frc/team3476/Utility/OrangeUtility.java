@@ -80,4 +80,20 @@ public class OrangeUtility
 		ret += "\n";
 		return ret;
 	}
+	
+	/**
+	 * Encapsulates Thread.sleep to make code more readable.
+	 * @param millis the time to sleep
+	 */
+	public static void sleep(long millis)
+	{
+		try
+		{
+			Thread.sleep(millis);
+		}
+		catch (InterruptedException e)
+		{
+			e.printStackTrace();
+		}
+	}
 }

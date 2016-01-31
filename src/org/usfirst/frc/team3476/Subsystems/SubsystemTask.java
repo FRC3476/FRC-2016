@@ -7,8 +7,9 @@ public class SubsystemTask extends SafeTask
 {
 	private Subsystem system;
 	
-	public SubsystemTask(Subsystem systemin)
+	public SubsystemTask(Subsystem systemin, int minTime)
 	{
+		super(minTime);
 		system = systemin;
 	}
 
