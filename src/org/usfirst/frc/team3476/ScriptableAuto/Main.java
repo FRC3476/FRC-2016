@@ -140,27 +140,34 @@ public class Main
 		for(Subsystem current : systems)
 		{
 			//Return requested constants to the subsystem
-			if(current != null)
+			if(current != null) //Whether the subsystem exists or not
 			{
+				//System.out.println("Current not null");
 				String[] request = current.getConstantRequest();
 				if(request != null)
 				{
+					//System.out.println("request not null");
 					double[] response = new double[request.length];
+					//System.out.println("double received");
 					try
 					{
 						for (int i = 0; i < request.length; i++)
 						{
+							//System.out.println("getConstant Request 1");
 							response[i] = par.getConstant(request[i]);
+							//System.out.println("getConstantRequest 2");
 						}
 						current.returnConstantRequest(response);
+						//System.out.println("tryblock done");
 					}
 					catch (IOException e)
 					{
 						for (int i = 0; i < response.length; i++)
 							response[i] = 0.0;
 						current.returnConstantRequest(response);
-						System.out.println("IOEXCEPTION: " + e.getMessage());
+						System.out.print("exception" + e.getMessage());
 					}
+					//System.out.println("if done");
 				}
 				else
 				{
@@ -168,6 +175,7 @@ public class Main
 				}
 			}
 		}
+		//System.out.println("passConstants");
 	}
 	
 	/**

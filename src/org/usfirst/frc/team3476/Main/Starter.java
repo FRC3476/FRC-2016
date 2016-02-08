@@ -37,6 +37,7 @@ public class Starter extends SafeTask
 		{
 			main.initialize(year, systems);
 			mainInitd = true;
+			System.out.println("IMPORTANT DONE");
 		}
 		else if(!cameradone)
 		{

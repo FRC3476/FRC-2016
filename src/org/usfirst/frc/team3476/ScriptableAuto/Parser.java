@@ -181,9 +181,7 @@ public class Parser
 	public double getConstant(String key) throws IOException
 	{
 		Matcher match = Pattern.compile("^" + key + "\\s*=", Pattern.MULTILINE).matcher(constants);
-		
 		int keydex = match.find() ? match.end() : -1;
-		
 		if(keydex == -1)
 		{
 			System.out.println("Match not found for key " + key);

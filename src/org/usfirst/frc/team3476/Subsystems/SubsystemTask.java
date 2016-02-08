@@ -14,8 +14,8 @@ public class SubsystemTask extends SafeTask
 	}
 
 	@Override
-	public void action()
+	public synchronized void action()
 	{
-		system.update();	
+		system.update();
 	}
 }

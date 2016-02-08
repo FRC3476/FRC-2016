@@ -10,8 +10,10 @@ public class StartSubsystem
 		for(String command : robotDriveSystem.getAutoCommands())
 		{
 			if(command.toLowerCase().indexOf("clear") != -1)
-			{
+			{ 
+				//System.out.println("command");
 				robotDriveSystem.doAuto(null, command);
+				//System.out.println("Drive System");
 				return;
 			}
 		}

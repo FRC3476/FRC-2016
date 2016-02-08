@@ -182,7 +182,6 @@ public class Drive implements Subsystem
 		i++;//15
 		SHIFTINGHYS = constantsin[i];
 		//System.out.println("P: " + TURNP + " I: " + TURNI + " D: " + TURND + " Isvalid: " + constantsin.length);
-		startThreads();
 		both.setUse(USELEFT, USERIGHT);
 	}
 

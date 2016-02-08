@@ -27,7 +27,7 @@ public abstract class SafeTask implements Runnable
 	 * Pauses thread execution.
 	 */
 	public synchronized void hold()
-	{
+	{ 
 		action = false;
 	}
 	

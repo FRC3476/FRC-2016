@@ -3,6 +3,7 @@ package org.usfirst.frc.team3476.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.Joystick.AxisType;
 import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Solenoid;
@@ -107,6 +108,7 @@ public class Robot extends IterativeRobot
      */
     public void robotInit()
     {
+    	System.out.println("robotInit");
         joy = new Joystick(0);
         systems = new Subsystem[10];
 		systems[0] = new Drive(leftDrive, rightDrive, gyro, drive, shifterSoleniod);
@@ -123,7 +125,10 @@ public class Robot extends IterativeRobot
 	 * If using the SendableChooser make sure to add them to the chooser code above as well.
 	 */
     @Override
-	public void autonomousInit(){first = true;}
+	public void autonomousInit()
+    {
+    	first = true;
+    }
     
     /**
      * This function is called periodically during autonomous.
@@ -144,6 +149,7 @@ public class Robot extends IterativeRobot
 	@Override
 	public void disabledInit()
 	{
+		System.out.println("disabledInit");
 		first = true;
 		threads = 0;
 	}
@@ -152,42 +158,58 @@ public class Robot extends IterativeRobot
 	{
 		if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
 		{
-			main.updateData();
 			if(first)
 			{
+				System.out.println("disabledPeriodic first");
 				main.stopSubsystems();//Stop auto threads, we're not in auto
 				main.stop();
 				first = false;
 			}
+			main.updateData();
+			main.robotDriveClear();
 		}
-		iters++;
-    	if(threads != Thread.getAllStackTraces().keySet().size()) System.out.println("Threads changed: " + Thread.getAllStackTraces().keySet().size());
+    	if(threads != Thread.getAllStackTraces().keySet().size())
+    	{
+    		System.out.println("Threads changed: " + Thread.getAllStackTraces().keySet().size());
+    	}
     	threads = Thread.getAllStackTraces().keySet().size();
+    	
 	}
     
-    public void teleopInit(){first = true;}
+	@Override
+    public void teleopInit()
+    {
+		System.out.println("teleopInit");
+    	first = true;
+    }
 
     /**
      * This function is called periodically during operator control
      */
     public void teleopPeriodic()
     {
-    	
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
     		if(first)//For the first time in forever
     		{
+    			System.out.println("teleopPeriodic first");
 				//DO THINGS
 				main.startSubsystems();//we need subsystems but not main
+				systems[1].stopThreads();
 				first = false;
 			}
     		if(!first)
     		{
     			main.robotDriveClear();
-    			if (joy.getRawButton(1) && !lastJoy)
+    			/*if (joy.getRawButton(1) && !lastJoy)
     				((Shooter) systems[1]).aim();
     			if(!joy.getRawButton(1) && lastJoy)
-    				((Shooter) systems[1]).stopAim();
+    				((Shooter) systems[1]).stopAim();*/
+    			if(!joy.getRawButton(1))
+    			{
+    				System.out.println("Joy Value: " + joy.getAxis(AxisType.kX));
+    				turretTalon.set(joy.getAxis(AxisType.kX));
+    			}
     		}
 		}
     	lastJoy = joy.getRawButton(1);

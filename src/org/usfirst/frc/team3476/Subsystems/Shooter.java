@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Subsystems;
 
+import java.util.ResourceBundle.Control;
+
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
@@ -142,15 +144,12 @@ public class Shooter implements Subsystem
 		i++;//10
 		TURRETDEAD = constantsin[i];
 		
-		
 		control = new TakeBackHalf(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW}, SHOOTERIGAIN, FLYWHEELMAXSPEED);
 		control.setSetpoint(0);
 		
 		turretcontrol.setPID(TURRETP, TURRETI, TURRETD);
 		//System.out.println("Setting PID");
 		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
-		
-		startThreads();
 	}
 
 	//TODO: add firing logic
@@ -173,10 +172,11 @@ public class Shooter implements Subsystem
 		//fly2.set(output*FLYDIRS[1]);
 		
 		//Turret update
+		
 		if(!turretdone)
 		{
 			switch(aimmode)
-			{
+			{ 
 				case VISION:
 					if(turretsource != vision)
 					{
@@ -221,8 +221,15 @@ public class Shooter implements Subsystem
 		
 		//Check if we're done here 
 		//TODO: Decide if the flywheel needs to be in the deadzone for multiple iterations
-		if(true /*Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD*/) flyDone = true;
-		if(!firing) loadDone = true;
+		
+		if(true /*Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD*/)
+			{
+			flyDone = true;
+			}
+		if(!firing)
+		{
+			loadDone = true;
+		}
 		iters++;
 	}
 	

@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Subsystems;
 
+import javax.print.attribute.standard.PrinterLocation;
+
 import org.usfirst.frc.team3476.Main.Subsystem;
 import edu.wpi.first.wpilibj.Relay;
 import edu.wpi.first.wpilibj.Relay.Value;
@@ -92,11 +94,10 @@ public class Intake implements Subsystem
 
 	@Override
 	public synchronized void returnConstantRequest(double[] constantsin)
-	{
+	{ 
 		SUCKMOTORSPEED = constantsin[0];
 		LOADMOTORSPEED = constantsin[1];
 		FORWARDISDOWN = constantsin[2] == 1;
-		startThreads();
 	}
 
 	@Override
