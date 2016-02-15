@@ -6,30 +6,30 @@ import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.PIDSource;
 
-public class DifferentialGyro extends AnalogGyro implements PIDSource
+public class DifferentialAnalogGyro extends AnalogGyro implements PIDSource
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;
 	
-	public DifferentialGyro(int channel)
+	public DifferentialAnalogGyro(int channel)
 	{
 		super(channel);
 		samples = DEFSAMPLES;
 	}
 	
-	public DifferentialGyro(int channel, int numSamples)
+	public DifferentialAnalogGyro(int channel, int numSamples)
 	{
 		super(channel);
 		samples = numSamples;
 	}
 	
-	public DifferentialGyro(AnalogInput channel)
+	public DifferentialAnalogGyro(AnalogInput channel)
 	{
 		super(channel);
 		samples = DEFSAMPLES;
 	}
 	
-	public DifferentialGyro(AnalogInput channel, int numSamples)
+	public DifferentialAnalogGyro(AnalogInput channel, int numSamples)
 	{
 		super(channel);
 		samples = numSamples;
@@ -42,14 +42,9 @@ public class DifferentialGyro extends AnalogGyro implements PIDSource
 		return get() - lastHeading;
 	}
 	
-	public void reset()
+	public void resetDiff()
 	{
 		lastHeading = get();
-	}
-	
-	public void resetSuper()
-	{
-		super.reset();
 	}
 	
 	@Override

@@ -6,6 +6,7 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.Joystick.AxisType;
 import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.RobotDrive;
+import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Timer;
 import java.io.File;
@@ -16,10 +17,13 @@ import org.usfirst.frc.team3476.Main.Starter;
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.ScriptableAuto.Main;
 import org.usfirst.frc.team3476.Subsystems.*;
+import org.usfirst.frc.team3476.Utility.GyroInterface;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
-import org.usfirst.frc.team3476.Utility.Control.DifferentialGyro;
+import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
+import org.usfirst.frc.team3476.Utility.Control.DifferentialSPIGyro;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 
+import edu.wpi.first.wpilibj.CANTalon.SetValueMotionProfile;
 import edu.wpi.first.wpilibj.Counter;
 import edu.wpi.first.wpilibj.CounterBase.EncodingType;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
@@ -88,7 +92,8 @@ public class Robot extends IterativeRobot
     Main main;
     Subsystem[] systems;
     
-    DifferentialGyro gyro = new DifferentialGyro(0, 5);//TODO: get this channel
+    DifferentialAnalogGyro gyro = new DifferentialAnalogGyro(0, 5);//TODO: get this channel
+    //DifferentialSPIGyro spiGyro = new DifferentialSPIGyro(SPI.Port.kOnboardCS0);
     
     Counter tach = new Counter(0);//TODO: get this channel
     
@@ -99,8 +104,9 @@ public class Robot extends IterativeRobot
     int threads = 0;
     boolean lastJoy = false;
     
-    boolean first = true;
+    boolean first = true, camfirst = true;
     
+    enum CameraMode {VISION, INTAKE};
     
     /**
      * This function is run when the robot is first started up and should be
@@ -110,14 +116,22 @@ public class Robot extends IterativeRobot
     {
     	System.out.println("robotInit");
         joy = new Joystick(0);
+        
+        //Systems
         systems = new Subsystem[10];
 		systems[0] = new Drive(leftDrive, rightDrive, gyro, drive, shifterSoleniod);
 		systems[1] = new Shooter(flyTalon1, flyTalon2, turretTalon, tach, turretenc);
+		
+		//Main
 		main = new Main();
-		starter = new Starter(main, "2016", systems, 0);
+		
+		//Starter
+		starter = new Starter(main, "2016", systems, 0, "10.94.76.11");
 		starterThread = new Thread(starter);
 		starter.resume();
 		starterThread.start();
+		
+		//spiGyro.calibrate();
     }
     
 	/**
@@ -151,6 +165,7 @@ public class Robot extends IterativeRobot
 	{
 		System.out.println("disabledInit");
 		first = true;
+		camfirst = true;
 		threads = 0;
 	}
 	
@@ -164,6 +179,10 @@ public class Robot extends IterativeRobot
 				main.stopSubsystems();//Stop auto threads, we're not in auto
 				main.stop();
 				first = false;
+			}
+			if(camfirst && starter.cameraDone())
+			{
+				setCameramode(CameraMode.INTAKE);
 			}
 			main.updateData();
 			main.robotDriveClear();
@@ -195,21 +214,30 @@ public class Robot extends IterativeRobot
     			System.out.println("teleopPeriodic first");
 				//DO THINGS
 				main.startSubsystems();//we need subsystems but not main
-				systems[1].stopThreads();
 				first = false;
 			}
     		if(!first)
     		{
     			main.robotDriveClear();
-    			/*if (joy.getRawButton(1) && !lastJoy)
+    			if (joy.getRawButton(1) && !lastJoy)
+    			{
     				((Shooter) systems[1]).aim();
+    				System.out.println("Aiming");
+    			}
     			if(!joy.getRawButton(1) && lastJoy)
-    				((Shooter) systems[1]).stopAim();*/
-    			if(!joy.getRawButton(1))
+    			{
+    				((Shooter) systems[1]).stopAim();
+    				System.out.println("Stopping");
+    			}
+    			/*if(!joy.getRawButton(1))
     			{
     				System.out.println("Joy Value: " + joy.getAxis(AxisType.kX));
     				turretTalon.set(joy.getAxis(AxisType.kX));
-    			}
+    			}*/
+    			
+    			setCameramode(CameraMode.VISION);
+    			
+    			//System.out.println("SPI Gyro: " + spiGyro.get());
     		}
 		}
     	lastJoy = joy.getRawButton(1);
@@ -219,4 +247,9 @@ public class Robot extends IterativeRobot
      * This function is called periodically during test mode
      */
     public void testPeriodic() {}
+    
+    public void setCameramode(CameraMode mode)
+    {
+    	Dashcomm.putBoolean("data/visioncam", mode == CameraMode.VISION);
+    }
 }

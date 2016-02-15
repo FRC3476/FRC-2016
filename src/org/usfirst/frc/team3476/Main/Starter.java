@@ -10,15 +10,16 @@ public class Starter extends SafeTask
 {
 	private boolean flushed = false, NTready = false, mainInitd = false, cameradone = false;
     private Main main;
-    private String year;
+    private String year, visioncamIP;
 	private Subsystem[] systems;
 	
-    public Starter(Main main_in, String yearin, Subsystem[] systemsin, int minTime)
+    public Starter(Main main_in, String yearin, Subsystem[] systemsin, int minTime, String visioncamIPin)
     {
     	super(minTime);
     	main = main_in;
     	year = yearin;
     	systems = systemsin;
+    	visioncamIP = visioncamIPin;
     }
     
 	@Override
@@ -56,6 +57,11 @@ public class Starter extends SafeTask
 		return flushed && NTready && mainInitd;
 	}
 	
+	public synchronized boolean cameraDone()
+	{
+		return cameradone;
+	}
+	
 	private void NTInit()
     {
     	if(NetworkTable.connections().length > 0)
@@ -66,9 +72,9 @@ public class Starter extends SafeTask
 	
 	private void cameraInit()
     {
-    	OrangeCamera cam = new OrangeCamera("axis-camera.local");
+    	OrangeCamera cam = new OrangeCamera(visioncamIP);
     	cam.writeExposureControl(ExposureControl.kHold);
-    	cam.writeBrightness(0);
+    	cam.writeBrightness(50);
     	cam.writeExposure(0);
     }
 }

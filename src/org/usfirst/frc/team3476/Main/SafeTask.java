@@ -5,13 +5,13 @@ import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 public abstract class SafeTask implements Runnable
 {
-	private boolean running, action;
+	private boolean running, active;
 	private int executionTime = 10;
 	
 	public SafeTask(int minTime)
 	{
 		running = true;
-		action = false;
+		active = false;
 		executionTime = minTime;
 	}
 	
@@ -28,7 +28,7 @@ public abstract class SafeTask implements Runnable
 	 */
 	public synchronized void hold()
 	{ 
-		action = false;
+		active = false;
 	}
 	
 	/**
@@ -36,7 +36,7 @@ public abstract class SafeTask implements Runnable
 	 */
 	public synchronized void resume()
 	{
-		action = true;
+		active = true;
 	}
 	
 	/**
@@ -44,7 +44,7 @@ public abstract class SafeTask implements Runnable
 	 */
 	public synchronized boolean isActive()
 	{
-		return action;
+		return active;
 	}
 	
 	@Override
@@ -56,7 +56,7 @@ public abstract class SafeTask implements Runnable
 		long time;
 		while(running)
 		{
-			if(action)
+			if(active)
 			{
 				time = System.currentTimeMillis();
 				action();

@@ -22,13 +22,13 @@ import edu.wpi.first.wpilibj.Timer;
 public class Shooter implements Subsystem
 {
 	private final String[] autoCommands = {"shooter", "aim", "flywheel", "fire", "loader"};
-	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN", "FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETP", "TURRETI", "TURRETD", "TURRETDEAD"};
-	private final double RPMTORPS = 60;
+	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN", "FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETVISIONP", "TURRETVISIONI", "TURRETVISIOND", "TURRETVISIONDEAD", "TURRETENCODERP", "TURRETENCODERI", "TURRETENCODERD", "TURRETENCODERDEAD"};
+	private final double RPMTORPS = 60, TURRETOUTPUTRANGE = 0.25;
 	
 	enum AimMode{VISION, ENCODER}
 	AimMode aimmode;
 	
-	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD, FLYWHEELMAXSPEED, TURRETP, TURRETI, TURRETD, TURRETDEAD;
+	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD, FLYWHEELMAXSPEED, TURRETVISIONP, TURRETVISIONI, TURRETVISIOND, TURRETVISIONDEAD, TURRETENCODERP, TURRETENCODERI, TURRETENCODERD, TURRETENCODERDEAD;
 	private double aimangle;
 	private double[] FLYDIRS;
 	private boolean flyDone, loadDone, firing, firingLast, pass1, turretdone;
@@ -39,28 +39,36 @@ public class Shooter implements Subsystem
 	
 	private PIDDashdataWrapper vision;
 	private Encoder encoder;
-	private PIDSource turretsource;
-	private PIDController turretcontrol;
+	private PIDController turretvisioncontrol;
+	private PIDController turretencodercontrol;
 	
 	private SubsystemTask task;
 	private Thread flyThread;
 	
 	private int iters;
+	private boolean lastturretdone;
 	
 	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController turretin, Counter tachin, Encoder encoderin)
 	{
 		//Turret setup
 		turret = turretin;
-		vision = new PIDDashdataWrapper(Data.VISIONX);
-		encoder = encoderin;
-		aimangle = 0;
-		turretsource = encoder;
 		turretdone = true;
 		aimmode = AimMode.ENCODER;
-		turretcontrol = new PIDController(0, 0, 0, vision, turret);
-		turretcontrol.disable();
-		turretcontrol.setOutputRange(-0.25, 0.25);
 		
+		//Vision tracking control
+		vision = new PIDDashdataWrapper(Data.VISIONX);
+		turretvisioncontrol = new PIDController(0, 0, 0, vision, turret);
+		turretvisioncontrol.disable();
+		turretvisioncontrol.setOutputRange(-TURRETOUTPUTRANGE, TURRETOUTPUTRANGE);
+		
+		//Encoder control
+		aimangle = 0;
+		encoder = encoderin;
+		turretencodercontrol = new PIDController(0, 0, 0, encoder, turret);
+		turretencodercontrol.disable();
+		turretencodercontrol.setOutputRange(-TURRETOUTPUTRANGE, TURRETOUTPUTRANGE);
+		
+		//Shooter
 		fly1 = fly1in;
 		fly2 = fly2in;
 		flyDone = true;
@@ -136,20 +144,30 @@ public class Shooter implements Subsystem
 		i++;//6
 		FLYWHEELMAXSPEED = constantsin[i];
 		i++;//7
-		TURRETP = constantsin[i];
+		TURRETVISIONP = constantsin[i];
 		i++;//8
-		TURRETI = constantsin[i];
+		TURRETVISIONI = constantsin[i];
 		i++;//9
-		TURRETD = constantsin[i];
+		TURRETVISIOND = constantsin[i];
 		i++;//10
-		TURRETDEAD = constantsin[i];
+		TURRETVISIONDEAD = constantsin[i];
+		i++;//11
+		TURRETENCODERP = constantsin[i];
+		i++;//12
+		TURRETENCODERI = constantsin[i];
+		i++;//13
+		TURRETENCODERD = constantsin[i];
+		i++;//14
+		TURRETENCODERDEAD = constantsin[i];
 		
+		//TODO: make this not lose state every five seconds
 		control = new TakeBackHalf(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW}, SHOOTERIGAIN, FLYWHEELMAXSPEED);
-		control.setSetpoint(0);
 		
-		turretcontrol.setPID(TURRETP, TURRETI, TURRETD);
+		turretvisioncontrol.setPID(TURRETVISIONP, TURRETVISIONI, TURRETVISIOND);
+		turretencodercontrol.setPID(TURRETENCODERP, TURRETENCODERI, TURRETENCODERD);
 		//System.out.println("Setting PID");
-		turretcontrol.setAbsoluteTolerance(TURRETDEAD);
+		turretvisioncontrol.setAbsoluteTolerance(TURRETVISIONDEAD);
+		turretencodercontrol.setAbsoluteTolerance(TURRETENCODERDEAD);
 	}
 
 	//TODO: add firing logic
@@ -158,7 +176,7 @@ public class Shooter implements Subsystem
 	{
 		//Take back half control
 		double output = 0;
-		/*double process = tach.getRate()*RPMTORPS;//Get rps > to rpm
+		double process = tach.getRate()*RPMTORPS;//Get rps > to rpm
 		if(control == null)
 		{
 			throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
@@ -166,71 +184,93 @@ public class Shooter implements Subsystem
 		else
 		{
 			output = control.output(process);
-		}*/
-		//output = control.getSetpoint() > 0 ? 1 : 0;
-		//fly1.set(output*FLYDIRS[0]);
-		//fly2.set(output*FLYDIRS[1]);
+		}
+		output = control.getSetpoint() > 0 ? 1 : 0;
+		fly1.set(output*FLYDIRS[0]);
+		fly2.set(output*FLYDIRS[1]);
 		
 		//Turret update
-		
 		if(!turretdone)
 		{
 			switch(aimmode)
-			{ 
+			{
 				case VISION:
-					if(turretsource != vision)
+					//If first exec, make sure we're using the right control
+					if(lastturretdone)
 					{
-						turretsource = vision;
+						turretencodercontrol.disable();
+						turretvisioncontrol.enable();
 					}
+					
+					//If not enabled, do it
 					if(targetAvailable())
 					{
-						if(iters % 5 == 0) System.out.println(OrangeUtility.PIDData(turretcontrol));
-						if(!turretcontrol.isEnabled())
+						if(iters % 5 == 0) System.out.println(OrangeUtility.PIDData(turretvisioncontrol));
+						
+						//If not enabled, do it
+						if(!turretvisioncontrol.isEnabled())
 						{
-							turretcontrol.enable();
+							turretvisioncontrol.enable();
 						}
-						turretcontrol.setSetpoint(0);
+						
+						turretvisioncontrol.setSetpoint(0);
+						
+						if(turretvisioncontrol.onTarget())
+						{
+							turretdone = true;
+							turretvisioncontrol.disable();
+						}
 					}
 					else
 					{
-						turretcontrol.disable();
+						turretvisioncontrol.disable();
 					}
 					break;
 					
 				case ENCODER:
-					if(turretsource != encoder)
+					//If first exec, make sure we're using the right control
+					if(lastturretdone)
 					{
-						turretsource = encoder;
+						turretencodercontrol.enable();
+						turretvisioncontrol.disable();
 					}
-					if(!turretcontrol.isEnabled())
+					
+					//If not enabled, do it
+					if(!turretencodercontrol.isEnabled())
 					{
-						turretcontrol.enable();
+						turretencodercontrol.enable();
 					}
-					turretcontrol.setSetpoint(aimangle);
-					if(turretcontrol.onTarget())
+					
+					turretencodercontrol.setSetpoint(aimangle);
+					
+					if(turretencodercontrol.onTarget())
 					{
 						turretdone = true;
+						turretencodercontrol.disable();
 					}
 					break;
 			}
 		}
 		else
 		{
-			turretcontrol.disable();
+			turretencodercontrol.disable();
+			turretvisioncontrol.disable();
 		}
 		
 		//Check if we're done here 
 		//TODO: Decide if the flywheel needs to be in the deadzone for multiple iterations
 		
-		if(true /*Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD*/)
-			{
+		if(Math.abs(control.getSetpoint() - process) < FLYWHEELDEAD)
+		{
 			flyDone = true;
-			}
+		}
 		if(!firing)
 		{
 			loadDone = true;
 		}
 		iters++;
+		
+		lastturretdone = turretdone;
 	}
 	
 	public synchronized void startFire()
@@ -256,8 +296,10 @@ public class Shooter implements Subsystem
 	 */
 	public synchronized void aim()
 	{
+		System.out.println("Aim called");
 		turretdone = false;
 		aimmode = AimMode.VISION;
+		System.out.println("turretdone = " + turretdone);
 	}
 	
 	/**
@@ -278,6 +320,7 @@ public class Shooter implements Subsystem
 	 */
 	public synchronized void stopAim()
 	{
+		System.out.println("Stopaim");
 		turretdone = true;
 	}
 	

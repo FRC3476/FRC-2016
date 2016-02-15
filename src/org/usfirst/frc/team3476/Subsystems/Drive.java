@@ -4,7 +4,7 @@ import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
-import org.usfirst.frc.team3476.Utility.Control.DifferentialGyro;
+import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoderPair;
 import org.usfirst.frc.team3476.Utility.Control.PIDOutputWrapper;
@@ -27,7 +27,7 @@ public class Drive implements Subsystem
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
-	private DifferentialGyro gyro;
+	private DifferentialAnalogGyro gyro;
 	private RunningAverage encoderAvg, avgRate;
 	private RobotDrive driveTrain;
 	private Solenoid shifters;
@@ -45,7 +45,7 @@ public class Drive implements Subsystem
 	Timer doneTimer;
 	Timer mainTimer;
 	
-	public Drive(MedianEncoder leftin, MedianEncoder rightin, DifferentialGyro gyroin, RobotDrive driveTrainin, Solenoid shiftersin)
+	public Drive(MedianEncoder leftin, MedianEncoder rightin, DifferentialAnalogGyro gyroin, RobotDrive driveTrainin, Solenoid shiftersin)
 	{
 		done = true;
 		driveStraight = true;

@@ -137,7 +137,7 @@ public static final int NUMDATAPIECES = 3;
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
-	 * @param value the double value to put
+	 * @param value the double[] value to put
 	 */
 	public static void putNumberArray(String keypath, double[] value)
 	{
@@ -147,7 +147,7 @@ public static final int NUMDATAPIECES = 3;
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
-	 * @param value the double value to put
+	 * @param value the String value to put
 	 */
 	public static void putString(String keypath, String value)
 	{
@@ -157,10 +157,20 @@ public static final int NUMDATAPIECES = 3;
 	/**
 	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
-	 * @param value the double value to put
+	 * @param value the String[] value to put
 	 */
 	public static void putStringArray(String keypath, String[] value)
 	{
 		NetworkTable.getTable("").putStringArray(keypath, value);
+	}
+	
+	/**
+	 * Simplifies the Dashboard communication by simply using the exact keypath of the value instead of the table and key.
+	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
+	 * @param value the boolean value to put
+	 */
+	public static void putBoolean(String keypath, boolean value)
+	{
+		NetworkTable.getTable("").putBoolean(keypath, value);
 	}
 }
