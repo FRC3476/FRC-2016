@@ -17,13 +17,16 @@ import edu.wpi.first.wpilibj.Timer;
 public class Drive implements Subsystem
 {
 	private final String[] autoCommands = {"turn", "drive", "driven", "shiftit", "clear"};
-	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT", "USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP", "DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED", "SHIFTINGHYS"};
+	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT", "USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP", "DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED", "SHIFTINGHYS", "DRIVEOUTPUTRANGE", "STRAIGHTOUTPUTRANGE", "TURNTIMEOUT", "TURNDONUTTHRESHOLD", "TURNCLAMP", "DONETIME"};
 	final int ENCODERSAMPLES = 16;
-	final double TURNTIMEOUT = 6/360.0, TURNDONUTTHRESHOLD = 0.33, TURNCLAMP = 0.6, DONETIME = 0.5;
+	final double MANUALTIMEOUT = 50;//in ms
 	final double SLOWSPEED = 0.4, SPECIALDIST = 12.0;
 	
-	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear;
-	private double turnTimeout, DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND, STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS;
+	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear, manual;
+	private double scaledTurnTimeout;
+	private double DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND, STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE, STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUTTHRESHOLD, TURNCLAMP, DONETIME;
+	
+	private long lastManualTime;
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
@@ -70,30 +73,30 @@ public class Drive implements Subsystem
 		
 		encoderAvg = new RunningAverage(ENCODERSAMPLES);
 		avgRate = new RunningAverage(ENCODERSAMPLES);
-		driveWrapper = new PIDOutputWrapper(false);
-		turnWrapper = new PIDOutputWrapper(true);
-		straightWrapper = new PIDOutputWrapper(true);
 		
 		//Driving PID
-		drive = new PIDController(DRIVEP, DRIVEI, DRIVED, both, driveWrapper);
-		drive.setOutputRange(-1, 1);
-		drive.enable();
+		driveWrapper = new PIDOutputWrapper(false);
+		drive = new PIDController(0, 0, 0, both, driveWrapper);
+		drive.disable();
 		
 		//Turn PID
-		turn = new PIDController(TURNP, TURNI, TURND, gyro, turnWrapper);
-		turn.setOutputRange(TURNDONUTTHRESHOLD - TURNCLAMP, TURNCLAMP - TURNDONUTTHRESHOLD);
-		turn.enable();
+		turnWrapper = new PIDOutputWrapper(true);
+		turn = new PIDController(0, 0, 0, gyro, turnWrapper);
+		turn.disable();
 		
 		//Drivestraight PID
-		straightTurn = new PIDController(STRAIGHTP, STRAIGHTI, STRAIGHTD, gyro, straightWrapper);
-		straightTurn.setOutputRange(-0.3, 0.3);
-		straightTurn.enable();
+		straightWrapper = new PIDOutputWrapper(true);
+		straightTurn = new PIDController(0, 0, 0, gyro, straightWrapper);
+		straightTurn.disable();
 		
-		driven = new BangBang(new double[]{1, -1});
+		driven = new BangBang(new double[]{0, 0});
 		
 		task = new SubsystemTask(this, 10);
 		driveThread = new Thread(task, "driveThread");
 		driveThread.start();
+		
+		manual = false;
+		lastManualTime = System.currentTimeMillis();
 	}
 	
 	@Override
@@ -181,6 +184,20 @@ public class Drive implements Subsystem
 		SHIFTINGSPEED = constantsin[i];
 		i++;//15
 		SHIFTINGHYS = constantsin[i];
+		i++;//16
+		DRIVEOUTPUTRANGE = constantsin[i];
+		i++;//17
+		STRAIGHTOUTPUTRANGE = constantsin[i];
+		i++;//18
+		TURNTIMEOUT = constantsin[i];
+		i++;//19
+		TURNDONUTTHRESHOLD = constantsin[i];
+		i++;//20
+		TURNCLAMP = constantsin[i];
+		i++;//21
+		DONETIME = constantsin[i];
+		
+		
 		//System.out.println("P: " + TURNP + " I: " + TURNI + " D: " + TURND + " Isvalid: " + constantsin.length);
 		both.setUse(USELEFT, USERIGHT);
 	}
@@ -191,55 +208,60 @@ public class Drive implements Subsystem
 		//Poll the encoders and gyro - see what up
 		if(!clear)
 		{
-			if (!done)
-			{
-				if (driveStraight)
+				if (!done)
 				{
-					if (!simple)
+					if (driveStraight)
 					{
-						driveTrain.arcadeDrive(driveWrapper.getOutput(), straightWrapper.getOutput());
+						if (!simple)
+						{
+							driveTrain.arcadeDrive(driveWrapper.getOutput(), straightWrapper.getOutput());
+						}
+						else
+						{
+							double bangbang = specialBangBang(both.getDistance());
+							//System.out.println("Simple drive with bang bang: " + bangbang + " error: " + driven.getError(both.getDistance()));
+							System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
+							driveTrain.arcadeDrive(bangbang, straightWrapper.getOutput());
+							//System.out.println("Drive setpoint: " + driven.getSetpoint() + " Current pos: " + both.getDistance());
+						}
 					}
-					else
+					else//Turning
 					{
-						double bangbang = specialBangBang(both.getDistance());
-						//System.out.println("Simple drive with bang bang: " + bangbang + " error: " + driven.getError(both.getDistance()));
-						System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
-						driveTrain.arcadeDrive(bangbang, straightWrapper.getOutput());
-						//System.out.println("Drive setpoint: " + driven.getSetpoint() + " Current pos: " + both.getDistance());
+						if(mainTimer.get() > scaledTurnTimeout) done = true;
+						//System.out.print("Turning with output: " + turnWrapper.getOutput() + "  ");
+						//System.out.println("Gyro: "  + gyro.calcDiff());
+						driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUTTHRESHOLD));
+					}
+					
+					//Check if we're done here 
+					//TODO: Decide if the drive needs to be in the deadzone for multiple iterations
+					boolean driveDone = Math.abs(drive.getSetpoint() - encoderAvg.pidGet()) < DRIVEDEAD;
+					boolean drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD;
+					boolean turnDone = Math.abs(turn.getError()) < TURNDEAD;
+					//System.out.println("Turn PID output: " + turn.get() + " error: " + (turn.getError()));
+					if(!(driveStraight ? (simple ? drivenDone : driveDone) : turnDone))
+					{
+						doneTimer.reset();
+					}
+					if(doneTimer.get() > DONETIME)
+					{
+						done = true;
 					}
 				}
-				else//Turning
+				else
 				{
-					if(mainTimer.get() > turnTimeout) done = true;
-					//System.out.print("Turning with output: " + turnWrapper.getOutput() + "  ");
-					//System.out.println("Gyro: "  + gyro.calcDiff());
-					driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUTTHRESHOLD));
+					if(!manual)
+						driveTrain.arcadeDrive(0, 0);
 				}
-				
-				//Check if we're done here 
-				//TODO: Decide if the drive needs to be in the deadzone for multiple iterations
-				boolean driveDone = Math.abs(drive.getSetpoint() - encoderAvg.pidGet()) < DRIVEDEAD;
-				boolean drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD;
-				boolean turnDone = Math.abs(turn.getError()) < TURNDEAD;
-				//System.out.println("Turn PID output: " + turn.get() + " error: " + (turn.getError()));
-				if(!(driveStraight ? (simple ? drivenDone : driveDone) : turnDone))
-				{
-					doneTimer.reset();
-				}
-				if(doneTimer.get() > DONETIME)
-				{
-					done = true;
-				}
-			}
-			else
-			{
-				driveTrain.arcadeDrive(0, 0);
-			}
 		}
 		else
 		{
-			driveTrain.arcadeDrive(0, 0);
+			if(!manual)
+				driveTrain.arcadeDrive(0, 0);
 		}
+		
+		if(System.currentTimeMillis() - lastManualTime > MANUALTIMEOUT)
+			manual = false;
 		
 		if(autoShifting)
 		{
@@ -265,30 +287,41 @@ public class Drive implements Subsystem
 		}
 	}
 	
+	/**
+	 * Performs an autonomous PID controlled turn.
+	 * @param delta the angle to turn relative to the current angle.
+	 */
 	public synchronized void executeTurn(double delta)
 	{
 		simple = false;
 		driveStraight = false;
-		turnTimeout = Math.abs(TURNTIMEOUT*delta);
+		scaledTurnTimeout = Math.abs(TURNTIMEOUT*delta);
 		
 		//turn init
 		gyro.reset();
 		turn.reset();
 		turn.setSetpoint(delta);
 		turn.setPID(TURNP, TURNI, TURND);
+		//subtraction so that the output to the arcade drive does not exceed TURNCLAMP after scaling by donut
+		turn.setOutputRange(TURNDONUTTHRESHOLD - TURNCLAMP, TURNCLAMP - TURNDONUTTHRESHOLD);
 		turn.enable();
 	}
 	
+	/**
+	 * Performs an autonomous PID controlled driving maneuver.
+	 * Keeps itself on a straight heading with a modified turning PID.
+	 * @param delta the distance in inches to move.
+	 */
 	public synchronized void executeDrive(double delta)
 	{
 		simple = false;
 		driveStraight = true;
 		
 		//drive init
-		
 		drive.reset();
 		drive.setSetpoint(both.getDistance() + delta);
 		drive.setPID(DRIVEP, DRIVEI, DRIVED);
+		drive.setOutputRange(-DRIVEOUTPUTRANGE, DRIVEOUTPUTRANGE);
 		drive.enable();
 		
 		//straightTurn init
@@ -296,14 +329,20 @@ public class Drive implements Subsystem
 		straightTurn.reset();
 		straightTurn.setSetpoint(0);
 		straightTurn.setPID(STRAIGHTP, STRAIGHTI, STRAIGHTD);
+		straightTurn.setOutputRange(-STRAIGHTOUTPUTRANGE, STRAIGHTOUTPUTRANGE);
 		straightTurn.enable();
 	}
 	
+	/**
+	 * Performs an autonomous BangBang controlled driving maneuver.
+	 * Keeps itself on a straight heading with a modified turning PID.
+	 * @param delta the distance in inches to move.
+	 * @param percentSpeed the 
+	 */
 	public synchronized void executeSimpleDrive(double delta, double percentSpeed)
 	{
 		simple = true;
 		driveStraight = true;
-		
 		driven.setOutputrange(new double[]{percentSpeed/100, -percentSpeed/100});
 		driven.setSetpoint(both.getDistance() + delta);
 		
@@ -313,6 +352,18 @@ public class Drive implements Subsystem
 		straightTurn.setSetpoint(0);
 		straightTurn.setPID(STRAIGHTP, STRAIGHTI, STRAIGHTD);
 		straightTurn.enable();
+	}
+	
+	/**
+	 * Controls the drive base with arcade drive values.
+	 * @param move the movement of y value
+	 * @param rotate the rotation or x value
+	 */
+	public void manualDrive(double move, double rotate)
+	{
+		manual = true;
+		driveTrain.arcadeDrive(move, rotate);
+		lastManualTime = System.currentTimeMillis();
 	}
 	
 	public String toString()
@@ -339,11 +390,19 @@ public class Drive implements Subsystem
 		}
 	}
 	
+	/**
+	 * Tells the drive system to automatically shift or not.
+	 * @param auto whether or not to auto-shift
+	 */
 	public void autoShifting(boolean auto)
 	{
 		autoShifting = auto;
 	}
 	
+	/**
+	 * Sets the shifter state.
+	 * @param state the state to shift to
+	 */
 	public synchronized void setShifterState(ShiftingState state)
 	{
 		switch(state)
@@ -370,6 +429,11 @@ public class Drive implements Subsystem
 		setShifterState(ShiftingState.LOW);
 	}
 	
+	/**
+	 * Augments the simple BangBang driving algorithm by slowing down near the end if faster than a certain value.
+	 * @param process the process variable - distance
+	 * @return the modified output
+	 */
 	private double specialBangBang(double process)
 	{
 		if(Math.abs(driven.getError(process)) < SPECIALDIST)

@@ -430,7 +430,8 @@ public class OrangeCamera {
   /**
    * This function actually reads the images from the camera.
    */
-  private void readImagesFromCamera() throws IOException {
+  @SuppressWarnings("deprecation")
+private void readImagesFromCamera() throws IOException {
     DataInputStream cameraInputStream = new DataInputStream(m_cameraSocket.getInputStream());
 
     while (!m_done) {

@@ -1,7 +1,5 @@
 package org.usfirst.frc.team3476.Communications;
 
-import java.util.Arrays;
-
 import edu.wpi.first.wpilibj.networktables.NetworkTable;
 
 /**

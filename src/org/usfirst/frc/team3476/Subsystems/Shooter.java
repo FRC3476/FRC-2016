@@ -1,6 +1,5 @@
 package org.usfirst.frc.team3476.Subsystems;
 
-import java.util.ResourceBundle.Control;
 
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
@@ -9,11 +8,12 @@ import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
 import org.usfirst.frc.team3476.Utility.Control.TakeBackHalf;
 
 import edu.wpi.first.wpilibj.Counter;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PIDController;
-import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.hal.DIOJNI;
 
 //TODO: javadoc comments if not specified by Subsystem
 /*
@@ -21,18 +21,25 @@ import edu.wpi.first.wpilibj.Timer;
  */
 public class Shooter implements Subsystem
 {
-	private final String[] autoCommands = {"shooter", "aim", "flywheel", "fire", "loader"};
-	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN", "FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETVISIONP", "TURRETVISIONI", "TURRETVISIOND", "TURRETVISIONDEAD", "TURRETENCODERP", "TURRETENCODERI", "TURRETENCODERD", "TURRETENCODERDEAD"};
-	private final double RPMTORPS = 60, TURRETOUTPUTRANGE = 0.25;
+	private final String[] autoCommands = {"shooter", "visionaim", "encoderaim", "flywheel", "fire", "reload"};
+	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN",
+			"FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETVISIONP", "TURRETVISIONI",
+			"TURRETVISIOND", "TURRETVISIONDEAD", "TURRETENCODERP", "TURRETENCODERI", "TURRETENCODERD",
+			"TURRETENCODERDEAD", "LOADERSPEED"};
+	private final double RPSPERRPM = 60, TURRETOUTPUTRANGE = 0.25;
 	
 	enum AimMode{VISION, ENCODER}
 	AimMode aimmode;
+	enum LoaderState{RELOADING, LOADED, FIRING, WAITING}
+	LoaderState loaderState;
 	
-	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD, FLYWHEELMAXSPEED, TURRETVISIONP, TURRETVISIONI, TURRETVISIOND, TURRETVISIONDEAD, TURRETENCODERP, TURRETENCODERI, TURRETENCODERD, TURRETENCODERDEAD;
+	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD,
+	FLYWHEELMAXSPEED, TURRETVISIONP, TURRETVISIONI, TURRETVISIOND, TURRETVISIONDEAD, TURRETENCODERP,
+	TURRETENCODERI, TURRETENCODERD, TURRETENCODERDEAD, LOADERSPEED;
 	private double aimangle;
 	private double[] FLYDIRS;
-	private boolean flyDone, loadDone, firing, firingLast, pass1, turretdone;
-	private SpeedController fly1, fly2, turret;
+	private boolean flyDone, loadDone, toFire, toReload, firingLast, pass1, turretdone, intakeRunning;
+	private SpeedController fly1, fly2, turret, loader;
 	private TakeBackHalf control;
 	private Counter tach;
 	private Timer shootingTimer;
@@ -41,6 +48,7 @@ public class Shooter implements Subsystem
 	private Encoder encoder;
 	private PIDController turretvisioncontrol;
 	private PIDController turretencodercontrol;
+	private DigitalInput loaderSwitch;
 	
 	private SubsystemTask task;
 	private Thread flyThread;
@@ -48,12 +56,23 @@ public class Shooter implements Subsystem
 	private int iters;
 	private boolean lastturretdone;
 	
-	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController turretin, Counter tachin, Encoder encoderin)
+	/**
+	 * 
+	 * @param fly1in
+	 * @param fly2in
+	 * @param loaderin
+	 * @param turretin
+	 * @param tachin
+	 * @param encoderin
+	 * @param loaderSwitchin
+	 */
+	public Shooter(SpeedController fly1in, SpeedController fly2in, SpeedController loaderin, SpeedController turretin, Counter tachin, Encoder encoderin, DigitalInput loaderSwitchin)
 	{
 		//Turret setup
 		turret = turretin;
 		turretdone = true;
 		aimmode = AimMode.ENCODER;
+		loaderState = LoaderState.WAITING;
 		
 		//Vision tracking control
 		vision = new PIDDashdataWrapper(Data.VISIONX);
@@ -74,9 +93,14 @@ public class Shooter implements Subsystem
 		flyDone = true;
 		loadDone = true;
 		tach = tachin;
-		firing = false;
+		toFire = false;
+		toReload = false;
 		shootingTimer = new Timer();
 		FLYDIRS = new double[2];
+		
+		//Loader
+		loaderSwitch = loaderSwitchin;
+		loader = loaderin;
 		
 		iters = 0;
 		task = new SubsystemTask(this, 10);
@@ -96,20 +120,23 @@ public class Shooter implements Subsystem
 		switch(command)
 		{
 			case "shooter":
-				flyDone = false;
-				
-				control.setSetpoint(params[1]);
+				setFly(params[1]);
 				break;
-			//TODO: use the actual aim method correctly
-			case "aim":
+			case "visionaim":
+				aim();
+				break;
+			case "encoderaim":
+				aim(params[0]);
 				break;
 			case "flywheel":
-				flyDone = false;
-				
-				control.setSetpoint(params[0]);
+				setFly(params[0]);
 				break;
 			//TODO: do firing right
 			case "fire":
+				startFire();
+				break;
+			case "reload":
+				startFire();
 				break;
 		}
 	}
@@ -159,24 +186,24 @@ public class Shooter implements Subsystem
 		TURRETENCODERD = constantsin[i];
 		i++;//14
 		TURRETENCODERDEAD = constantsin[i];
+		i++;//15
+		LOADERSPEED = constantsin[i];
 		
-		//TODO: make this not lose state every five seconds
-		control = new TakeBackHalf(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW}, SHOOTERIGAIN, FLYWHEELMAXSPEED);
-		
-		turretvisioncontrol.setPID(TURRETVISIONP, TURRETVISIONI, TURRETVISIOND);
-		turretencodercontrol.setPID(TURRETENCODERP, TURRETENCODERI, TURRETENCODERD);
 		//System.out.println("Setting PID");
 		turretvisioncontrol.setAbsoluteTolerance(TURRETVISIONDEAD);
 		turretencodercontrol.setAbsoluteTolerance(TURRETENCODERDEAD);
+		//System.out.println("P: " + TURRETENCODERP);
 	}
 
 	//TODO: add firing logic
 	@Override
 	public synchronized void update()//Flywheel and turret control loop
 	{
-		//Take back half control
+		//=====================
+		//=======Shooter=======
+		//=====================
 		double output = 0;
-		double process = tach.getRate()*RPMTORPS;//Get rps > to rpm
+		double process = tach.getRate()/RPSPERRPM;//Get rps > to rpm
 		if(control == null)
 		{
 			throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
@@ -185,9 +212,63 @@ public class Shooter implements Subsystem
 		{
 			output = control.output(process);
 		}
-		output = control.getSetpoint() > 0 ? 1 : 0;
+		//output = control.getSetpoint() > 0 ? 1 : 0;
 		fly1.set(output*FLYDIRS[0]);
 		fly2.set(output*FLYDIRS[1]);
+		
+		//======================
+		//========Loader========
+		//======================
+		switch(loaderState)
+		{
+			case WAITING:
+				loader.set(0);
+				if(intakeRunning || toReload)
+				{
+					loaderState = LoaderState.RELOADING;
+				}
+				loadDone = true;
+				
+				//Reset state to avoid unpredictable behavior
+				toFire = false;
+				break;
+				
+			case RELOADING:
+				loader.set(LOADERSPEED);
+				if(loaderSwitch.get())
+				{
+					loaderState = LoaderState.LOADED;
+				}
+				
+				//Reset state to avoid unpredictable behavior
+				toReload = false;
+				toFire = false;
+				break;
+				
+			case LOADED:
+				loader.set(0);
+				if(toFire)
+				{
+					loaderState = LoaderState.FIRING;
+				}
+				loadDone = true;
+				
+				//Reset state to avoid unpredictable behavior
+				toReload = false;
+				break;
+				
+			case FIRING:
+				loader.set(LOADERSPEED);
+				if(!loaderSwitch.get())
+				{
+					loaderState = LoaderState.WAITING;
+				}
+				
+				//Reset state to avoid unpredictable behavior
+				toReload = false;
+				toFire = false;
+				break;
+		}
 		
 		//Turret update
 		if(!turretdone)
@@ -264,23 +345,49 @@ public class Shooter implements Subsystem
 		{
 			flyDone = true;
 		}
-		if(!firing)
-		{
-			loadDone = true;
-		}
 		iters++;
 		
 		lastturretdone = turretdone;
 	}
 	
+	/**
+	 * Notifies the Shooter of the intake's activities.
+	 * @param runnning if the shooter is running
+	 */
+	public void intakeNotify(boolean runnning)
+	{
+		intakeRunning = runnning;
+	}
+	
+	/**
+	 * Tells the loader to reload. Only has an effect when waiting(not loaded or moving).
+	 */
+	public synchronized void reload()
+	{
+		toReload = true;
+		loadDone = false;
+	}
+	
+	/**
+	 * Tells the shooter to fire. Only has an effect when loaded(not waiting or moving).
+	 */
 	public synchronized void startFire()
 	{
-		firing = true;
+		toFire = true;
+		loadDone = false;
+	}
+	
+	/**
+	 * Resets the loader state to WAITING in case of bad things.
+	 */
+	public synchronized void resetLoader()
+	{
+		loaderState = LoaderState.WAITING;
 	}
 	
 	public synchronized boolean isFiring()
 	{
-		return firing;
+		return loaderState == LoaderState.FIRING;
 	}
 	
 	/**
@@ -296,10 +403,9 @@ public class Shooter implements Subsystem
 	 */
 	public synchronized void aim()
 	{
-		System.out.println("Aim called");
 		turretdone = false;
 		aimmode = AimMode.VISION;
-		System.out.println("turretdone = " + turretdone);
+		turretvisioncontrol.setPID(TURRETVISIONP, TURRETVISIONI, TURRETVISIOND);
 	}
 	
 	/**
@@ -311,6 +417,7 @@ public class Shooter implements Subsystem
 		turretdone = false;
 		aimangle = angle;
 		aimmode = AimMode.ENCODER;
+		turretencodercontrol.setPID(TURRETENCODERP, TURRETENCODERI, TURRETENCODERD);
 	}
 	
 	/**
@@ -342,6 +449,19 @@ public class Shooter implements Subsystem
 	{
 		return loader.get() ? Load.OUT : Load.IN;
 	}*/
+	
+	/**
+	 * Tells the control loop to change the flywheel rpm. 
+	 * @param rpm the setpoint for the flywheel in RPM
+	 */
+	public void setFly(double rpm)
+	{
+		flyDone = false;
+		control.setGain(SHOOTERIGAIN);
+		control.setMAX(FLYWHEELMAXSPEED);
+		control.setOutputrange(new double[]{SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW});
+		control.setSetpoint(rpm);
+	}
 	
 	public String toString()
 	{

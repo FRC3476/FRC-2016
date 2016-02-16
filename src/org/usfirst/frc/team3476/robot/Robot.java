@@ -6,7 +6,6 @@ import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.Joystick.AxisType;
 import edu.wpi.first.wpilibj.Talon;
 import edu.wpi.first.wpilibj.RobotDrive;
-import edu.wpi.first.wpilibj.SPI;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Timer;
 import java.io.File;
@@ -17,7 +16,6 @@ import org.usfirst.frc.team3476.Main.Starter;
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.ScriptableAuto.Main;
 import org.usfirst.frc.team3476.Subsystems.*;
-import org.usfirst.frc.team3476.Utility.GyroInterface;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialSPIGyro;
@@ -25,6 +23,7 @@ import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 
 import edu.wpi.first.wpilibj.CANTalon.SetValueMotionProfile;
 import edu.wpi.first.wpilibj.Counter;
+import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.CounterBase.EncodingType;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 
@@ -53,9 +52,11 @@ public class Robot extends IterativeRobot
 	double yAxis = -xbox.getRawAxis(1);
 	double rightTrigger = xbox.getRawAxis(3);
 	
-	Talon flyTalon1 = new Talon(0);
-	Talon flyTalon2 = new Talon(1);
-	Talon turretTalon = new Talon(2);
+	Talon flyTalon1 = new Talon(0),
+			flyTalon2 = new Talon(1),
+			turretTalon = new Talon(2),
+			loaderTalon = new Talon(3);//TODO: get this channel
+	
 	
 	//Flywheel constants
 	final double FLY1 = -1, FLY2 = 1;
@@ -89,6 +90,8 @@ public class Robot extends IterativeRobot
     MedianEncoder rightDrive = new MedianEncoder(1, 2, true, EncodingType.k4X, 5);
     MedianEncoder turretenc = new MedianEncoder(5, 6, true, EncodingType.k4X, 5);
     
+    DigitalInput loaderSwitch = new DigitalInput(-1);//TODO: get this channel
+    
     Main main;
     Subsystem[] systems;
     
@@ -120,7 +123,7 @@ public class Robot extends IterativeRobot
         //Systems
         systems = new Subsystem[10];
 		systems[0] = new Drive(leftDrive, rightDrive, gyro, drive, shifterSoleniod);
-		systems[1] = new Shooter(flyTalon1, flyTalon2, turretTalon, tach, turretenc);
+		systems[1] = new Shooter(flyTalon1, flyTalon2, loaderTalon, turretTalon, tach, turretenc, loaderSwitch);
 		
 		//Main
 		main = new Main();

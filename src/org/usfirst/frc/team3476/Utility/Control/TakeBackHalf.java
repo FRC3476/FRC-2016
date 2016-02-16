@@ -26,6 +26,11 @@ public class TakeBackHalf extends ControlLoop
 	{
 		gain = gainin;
 	}
+	
+	public void setMAX(double MAXIN)
+	{
+		MAX = MAXIN;
+	}
 
 	@Override
 	protected double run(double process)
