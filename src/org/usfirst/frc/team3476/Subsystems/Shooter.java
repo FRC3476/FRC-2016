@@ -1,6 +1,7 @@
 package org.usfirst.frc.team3476.Subsystems;
 
 
+import org.usfirst.frc.team3476.Main.ManualHandler;
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
@@ -56,6 +57,9 @@ public class Shooter implements Subsystem
 	private int iters;
 	private boolean lastturretdone;
 	
+	final long MANUALTIMEOUT = 50;//in ms
+	private ManualHandler shooterManual, loaderManual, turretManual;
+	
 	/**
 	 * 
 	 * @param fly1in
@@ -102,6 +106,10 @@ public class Shooter implements Subsystem
 		loaderSwitch = loaderSwitchin;
 		loader = loaderin;
 		
+		//Manuals
+		shooterManual = new ManualHandler(MANUALTIMEOUT);
+		turretManual = new ManualHandler(MANUALTIMEOUT);
+		
 		iters = 0;
 		task = new SubsystemTask(this, 10);
 		flyThread = new Thread(task, "flyThread");
@@ -131,7 +139,6 @@ public class Shooter implements Subsystem
 			case "flywheel":
 				setFly(params[0]);
 				break;
-			//TODO: do firing right
 			case "fire":
 				startFire();
 				break;
@@ -195,26 +202,29 @@ public class Shooter implements Subsystem
 		//System.out.println("P: " + TURRETENCODERP);
 	}
 
-	//TODO: add firing logic
 	@Override
 	public synchronized void update()//Flywheel and turret control loop
 	{
+		double process = tach.getRate()/RPSPERRPM;//Get rps > to rpm
+		double output = 0;
+		
 		//=====================
 		//=======Shooter=======
 		//=====================
-		double output = 0;
-		double process = tach.getRate()/RPSPERRPM;//Get rps > to rpm
-		if(control == null)
+		if(shooterManual.isTimeUp())
 		{
-			throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
+			if(control == null)
+			{
+				throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
+			}
+			else
+			{
+				output = control.output(process);
+			}
+			//output = control.getSetpoint() > 0 ? 1 : 0;
+			fly1.set(output*FLYDIRS[0]);
+			fly2.set(output*FLYDIRS[1]);
 		}
-		else
-		{
-			output = control.output(process);
-		}
-		//output = control.getSetpoint() > 0 ? 1 : 0;
-		fly1.set(output*FLYDIRS[0]);
-		fly2.set(output*FLYDIRS[1]);
 		
 		//======================
 		//========Loader========
@@ -270,72 +280,77 @@ public class Shooter implements Subsystem
 				break;
 		}
 		
-		//Turret update
-		if(!turretdone)
+		//======================
+		//========Turret========
+		//======================
+		if(turretManual.isTimeUp())
 		{
-			switch(aimmode)
+			if(!turretdone)
 			{
-				case VISION:
-					//If first exec, make sure we're using the right control
-					if(lastturretdone)
-					{
-						turretencodercontrol.disable();
-						turretvisioncontrol.enable();
-					}
-					
-					//If not enabled, do it
-					if(targetAvailable())
-					{
-						if(iters % 5 == 0) System.out.println(OrangeUtility.PIDData(turretvisioncontrol));
-						
-						//If not enabled, do it
-						if(!turretvisioncontrol.isEnabled())
+				switch(aimmode)
+				{
+					case VISION:
+						//If first exec, make sure we're using the right control
+						if(lastturretdone)
 						{
+							turretencodercontrol.disable();
 							turretvisioncontrol.enable();
 						}
 						
-						turretvisioncontrol.setSetpoint(0);
-						
-						if(turretvisioncontrol.onTarget())
+						//If not enabled, do it
+						if(targetAvailable())
 						{
-							turretdone = true;
+							if(iters % 5 == 0) System.out.println(OrangeUtility.PIDData(turretvisioncontrol));
+							
+							//If not enabled, do it
+							if(!turretvisioncontrol.isEnabled())
+							{
+								turretvisioncontrol.enable();
+							}
+							
+							turretvisioncontrol.setSetpoint(0);
+							
+							if(turretvisioncontrol.onTarget())
+							{
+								turretdone = true;
+								turretvisioncontrol.disable();
+							}
+						}
+						else
+						{
 							turretvisioncontrol.disable();
 						}
-					}
-					else
-					{
-						turretvisioncontrol.disable();
-					}
-					break;
-					
-				case ENCODER:
-					//If first exec, make sure we're using the right control
-					if(lastturretdone)
-					{
-						turretencodercontrol.enable();
-						turretvisioncontrol.disable();
-					}
-					
-					//If not enabled, do it
-					if(!turretencodercontrol.isEnabled())
-					{
-						turretencodercontrol.enable();
-					}
-					
-					turretencodercontrol.setSetpoint(aimangle);
-					
-					if(turretencodercontrol.onTarget())
-					{
-						turretdone = true;
-						turretencodercontrol.disable();
-					}
-					break;
+						break;
+						
+					case ENCODER:
+						//If first exec, make sure we're using the right control
+						if(lastturretdone)
+						{
+							turretencodercontrol.enable();
+							turretvisioncontrol.disable();
+						}
+						
+						//If not enabled, do it
+						if(!turretencodercontrol.isEnabled())
+						{
+							turretencodercontrol.enable();
+						}
+						
+						turretencodercontrol.setSetpoint(aimangle);
+						
+						if(turretencodercontrol.onTarget())
+						{
+							turretdone = true;
+							turretencodercontrol.disable();
+						}
+						break;
+				}
 			}
-		}
-		else
-		{
-			turretencodercontrol.disable();
-			turretvisioncontrol.disable();
+			else
+			{
+				turretencodercontrol.disable();
+				turretvisioncontrol.disable();
+			}
 		}
 		
 		//Check if we're done here 
@@ -348,6 +363,26 @@ public class Shooter implements Subsystem
 		iters++;
 		
 		lastturretdone = turretdone;
+	}
+	
+	/**
+	 * Controls the turret with simple motor values.
+	 * @param rotate the rotation value
+	 */
+	public void manualTurret(double rotate)
+	{
+		turretManual.poke();
+		turret.set(rotate);
+	}
+	
+	/**
+	 * Controls the turret with simple motor values.
+	 * @param rotate the rotation value
+	 */
+	public void manualShooter(double rotate)
+	{
+		shooterManual.poke();
+		turret.set(rotate);
 	}
 	
 	/**
@@ -430,25 +465,6 @@ public class Shooter implements Subsystem
 		System.out.println("Stopaim");
 		turretdone = true;
 	}
-	
-	//TODO: do we need this?
-	/*public synchronized void loader(Load dir)
-	{
-		switch(dir)
-		{
-			case IN:
-				loader.set(false);
-				break;
-			case OUT:
-				loader.set(true);
-				break;
-		}
-	}
-	
-	public synchronized Load getLoader()
-	{
-		return loader.get() ? Load.OUT : Load.IN;
-	}*/
 	
 	/**
 	 * Tells the control loop to change the flywheel rpm. 

@@ -221,17 +221,30 @@ public class Robot extends IterativeRobot
 			}
     		if(!first)
     		{
+    			Shooter shooter = (Shooter)systems[1];
     			main.robotDriveClear();
     			if (joy.getRawButton(1) && !lastJoy)
     			{
-    				((Shooter) systems[1]).aim();
+    				shooter.aim();
     				System.out.println("Aiming");
     			}
     			if(!joy.getRawButton(1) && lastJoy)
     			{
-    				((Shooter) systems[1]).stopAim();
+    				shooter.stopAim();
     				System.out.println("Stopping");
     			}
+    			
+    			double FLYWHEELMAX = 8500;
+    			
+    			if(joy.getRawButton(2))
+    			{
+    				shooter.setFly(((joy.getRawAxis(4) + 1)/2)*FLYWHEELMAX);
+    			}
+    			else
+    			{
+    				shooter.setFly(0);
+    			}
+    			
     			/*if(!joy.getRawButton(1))
     			{
     				System.out.println("Joy Value: " + joy.getAxis(AxisType.kX));

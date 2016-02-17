@@ -1,5 +1,6 @@
 	package org.usfirst.frc.team3476.Subsystems;
 
+import org.usfirst.frc.team3476.Main.ManualHandler;
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
@@ -19,14 +20,14 @@ public class Drive implements Subsystem
 	private final String[] autoCommands = {"turn", "drive", "driven", "shiftit", "clear"};
 	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT", "USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP", "DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED", "SHIFTINGHYS", "DRIVEOUTPUTRANGE", "STRAIGHTOUTPUTRANGE", "TURNTIMEOUT", "TURNDONUTTHRESHOLD", "TURNCLAMP", "DONETIME"};
 	final int ENCODERSAMPLES = 16;
-	final double MANUALTIMEOUT = 50;//in ms
+	final long MANUALTIMEOUT = 50;//in ms
 	final double SLOWSPEED = 0.4, SPECIALDIST = 12.0;
 	
-	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear, manual;
+	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear;
 	private double scaledTurnTimeout;
 	private double DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND, STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE, STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUTTHRESHOLD, TURNCLAMP, DONETIME;
 	
-	private long lastManualTime;
+	private ManualHandler driveManual;
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
@@ -95,8 +96,7 @@ public class Drive implements Subsystem
 		driveThread = new Thread(task, "driveThread");
 		driveThread.start();
 		
-		manual = false;
-		lastManualTime = System.currentTimeMillis();
+		driveManual = new ManualHandler(MANUALTIMEOUT);
 	}
 	
 	@Override
@@ -197,7 +197,6 @@ public class Drive implements Subsystem
 		i++;//21
 		DONETIME = constantsin[i];
 		
-		
 		//System.out.println("P: " + TURNP + " I: " + TURNI + " D: " + TURND + " Isvalid: " + constantsin.length);
 		both.setUse(USELEFT, USERIGHT);
 	}
@@ -250,18 +249,15 @@ public class Drive implements Subsystem
 				}
 				else
 				{
-					if(!manual)
+					if(driveManual.isTimeUp())
 						driveTrain.arcadeDrive(0, 0);
 				}
 		}
 		else
 		{
-			if(!manual)
+			if(driveManual.isTimeUp())
 				driveTrain.arcadeDrive(0, 0);
 		}
-		
-		if(System.currentTimeMillis() - lastManualTime > MANUALTIMEOUT)
-			manual = false;
 		
 		if(autoShifting)
 		{
@@ -361,9 +357,8 @@ public class Drive implements Subsystem
 	 */
 	public void manualDrive(double move, double rotate)
 	{
-		manual = true;
+		driveManual.poke();
 		driveTrain.arcadeDrive(move, rotate);
-		lastManualTime = System.currentTimeMillis();
 	}
 	
 	public String toString()
