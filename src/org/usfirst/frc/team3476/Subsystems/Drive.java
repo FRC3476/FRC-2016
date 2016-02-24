@@ -1,7 +1,7 @@
 	package org.usfirst.frc.team3476.Subsystems;
 
-import org.usfirst.frc.team3476.Main.ManualHandler;
 import org.usfirst.frc.team3476.Main.Subsystem;
+import org.usfirst.frc.team3476.Utility.ManualHandler;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
@@ -27,7 +27,7 @@ public class Drive implements Subsystem
 	private double scaledTurnTimeout;
 	private double DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND, STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE, STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUTTHRESHOLD, TURNCLAMP, DONETIME;
 	
-	private ManualHandler driveManual;
+	private ManualHandler driveManual, shifterManual;
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
@@ -71,6 +71,7 @@ public class Drive implements Subsystem
 		gyro = gyroin;
 		driveTrain = driveTrainin;
 		shifters = shiftersin;
+		shifterManual = new ManualHandler(50);
 		
 		encoderAvg = new RunningAverage(ENCODERSAMPLES);
 		avgRate = new RunningAverage(ENCODERSAMPLES);
@@ -204,82 +205,88 @@ public class Drive implements Subsystem
 	@Override
 	public synchronized void update()
 	{
-		//Poll the encoders and gyro - see what up
-		if(!clear)
+		if(driveManual.isTimeUp())
 		{
-				if (!done)
-				{
-					if (driveStraight)
+			if(!clear)
+			{
+					if (!done)
 					{
-						if (!simple)
+						if (driveStraight)
 						{
-							driveTrain.arcadeDrive(driveWrapper.getOutput(), straightWrapper.getOutput());
+							if (!simple)
+							{
+								driveTrain.arcadeDrive(driveWrapper.getOutput(), straightWrapper.getOutput());
+							}
+							else
+							{
+								double bangbang = specialBangBang(both.getDistance());
+								//System.out.println("Simple drive with bang bang: " + bangbang + " error: " + driven.getError(both.getDistance()));
+								System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
+								driveTrain.arcadeDrive(bangbang, straightWrapper.getOutput());
+								//System.out.println("Drive setpoint: " + driven.getSetpoint() + " Current pos: " + both.getDistance());
+							}
 						}
-						else
+						else//Turning
 						{
-							double bangbang = specialBangBang(both.getDistance());
-							//System.out.println("Simple drive with bang bang: " + bangbang + " error: " + driven.getError(both.getDistance()));
-							System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
-							driveTrain.arcadeDrive(bangbang, straightWrapper.getOutput());
-							//System.out.println("Drive setpoint: " + driven.getSetpoint() + " Current pos: " + both.getDistance());
+							if(mainTimer.get() > scaledTurnTimeout) done = true;
+							//System.out.print("Turning with output: " + turnWrapper.getOutput() + "  ");
+							//System.out.println("Gyro: "  + gyro.calcDiff());
+							driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUTTHRESHOLD));
+						}
+						
+						//Check if we're done here 
+						//TODO: Decide if the drive needs to be in the deadzone for multiple iterations
+						boolean driveDone = Math.abs(drive.getSetpoint() - encoderAvg.pidGet()) < DRIVEDEAD;
+						boolean drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD;
+						boolean turnDone = Math.abs(turn.getError()) < TURNDEAD;
+						//System.out.println("Turn PID output: " + turn.get() + " error: " + (turn.getError()));
+						if(!(driveStraight ? (simple ? drivenDone : driveDone) : turnDone))
+						{
+							doneTimer.reset();
+						}
+						if(doneTimer.get() > DONETIME)
+						{
+							done = true;
 						}
 					}
-					else//Turning
+					else
 					{
-						if(mainTimer.get() > scaledTurnTimeout) done = true;
-						//System.out.print("Turning with output: " + turnWrapper.getOutput() + "  ");
-						//System.out.println("Gyro: "  + gyro.calcDiff());
-						driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUTTHRESHOLD));
+							driveTrain.arcadeDrive(0, 0);
 					}
-					
-					//Check if we're done here 
-					//TODO: Decide if the drive needs to be in the deadzone for multiple iterations
-					boolean driveDone = Math.abs(drive.getSetpoint() - encoderAvg.pidGet()) < DRIVEDEAD;
-					boolean drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD;
-					boolean turnDone = Math.abs(turn.getError()) < TURNDEAD;
-					//System.out.println("Turn PID output: " + turn.get() + " error: " + (turn.getError()));
-					if(!(driveStraight ? (simple ? drivenDone : driveDone) : turnDone))
-					{
-						doneTimer.reset();
-					}
-					if(doneTimer.get() > DONETIME)
-					{
-						done = true;
-					}
-				}
-				else
-				{
-					if(driveManual.isTimeUp())
-						driveTrain.arcadeDrive(0, 0);
-				}
+			}
+			else
+			{
+					driveTrain.arcadeDrive(0, 0);
+			}
 		}
-		else
+		else//manual override
 		{
-			if(driveManual.isTimeUp())
-				driveTrain.arcadeDrive(0, 0);
 		}
 		
-		if(autoShifting)
+		if(shifterManual.isTimeUp())
 		{
-			switch(shiftingState)
-	    	{
-	    		case HIGH:
-	    			//System.out.print("Case: HIGH, Rate = " + Math.abs(avgRate.getAverage()));
-	    			if(Math.abs(avgRate.getAverage()) <= SHIFTINGSPEED - SHIFTINGHYS)
-	    			{
-	    				shiftingState = ShiftingState.LOW;
-	    				setShifterState(shiftingState);
-	    			}
-	    			break;
-	    		case LOW:
-	    			//System.out.print("Case: LOW, Rate = " + Math.abs(avgRate.getAverage()));
-	    			if(Math.abs(avgRate.getAverage()) >= SHIFTINGSPEED + SHIFTINGHYS)
-    				{
-	    				shiftingState = ShiftingState.HIGH;
-	    				setShifterState(shiftingState);
-    				}
-	    			break;
-	    	}
+			if(autoShifting)
+			{
+				switch(shiftingState)
+		    	{
+		    		case HIGH:
+		    			//System.out.print("Case: HIGH, Rate = " + Math.abs(avgRate.getAverage()));
+		    			if(Math.abs(avgRate.getAverage()) <= SHIFTINGSPEED - SHIFTINGHYS)
+		    			{
+		    				shiftingState = ShiftingState.LOW;
+		    				setShifterState(shiftingState);
+		    			}
+		    			break;
+		    		case LOW:
+		    			//System.out.print("Case: LOW, Rate = " + Math.abs(avgRate.getAverage()));
+		    			if(Math.abs(avgRate.getAverage()) >= SHIFTINGSPEED + SHIFTINGHYS)
+	    				{
+		    				shiftingState = ShiftingState.HIGH;
+		    				setShifterState(shiftingState);
+	    				}
+		    			break;
+		    	}
+			}
 		}
 	}
 	
@@ -359,6 +366,16 @@ public class Drive implements Subsystem
 	{
 		driveManual.poke();
 		driveTrain.arcadeDrive(move, rotate);
+	}
+	
+	/**
+	 * Controls the shifters with a boolean.
+	 * @param state the state of the shifters
+	 */
+	public void manualShift(ShiftingState state)
+	{
+		shifterManual.poke();
+		setShifterState(state);
 	}
 	
 	public String toString()

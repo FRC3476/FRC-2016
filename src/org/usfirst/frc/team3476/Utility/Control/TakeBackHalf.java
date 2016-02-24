@@ -27,6 +27,11 @@ public class TakeBackHalf extends ControlLoop
 		gain = gainin;
 	}
 	
+	public double getGain()
+	{
+		return gain;
+	}
+	
 	public void setMAX(double MAXIN)
 	{
 		MAX = MAXIN;
@@ -61,5 +66,15 @@ public class TakeBackHalf extends ControlLoop
 	public double getMax()
 	{
 		return MAX;
+	}
+	
+	@Override
+	public boolean equals(Object other)
+	{
+		TakeBackHalf oth = (TakeBackHalf)other;
+		boolean result = super.equals(other);
+		result = result && OrangeUtility.doubleEqual(this.gain, oth.gain);
+		result = result && OrangeUtility.doubleEqual(this.MAX, oth.MAX);
+		return result;
 	}
 }

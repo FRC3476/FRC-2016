@@ -2,6 +2,11 @@ package org.usfirst.frc.team3476.Subsystems;
 
 
 import org.usfirst.frc.team3476.Main.Subsystem;
+import org.usfirst.frc.team3476.Utility.ManualHandler;
+import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
+
+import edu.wpi.first.wpilibj.CANTalon;
+import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.Relay;
 import edu.wpi.first.wpilibj.Relay.Value;
 import edu.wpi.first.wpilibj.SpeedController;
@@ -9,31 +14,48 @@ import edu.wpi.first.wpilibj.Timer;
 
 public class Intake implements Subsystem
 {
-	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime;
+	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP, DDCONTROLI, DDCONTROLD, DDCONTROLDEAD;
 	final String[] autoCommands = {"intake", "dropdown"};
-	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN"};
+	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD"};
 	private boolean done, FORWARDISDOWN, started;
 	
-	private SpeedController dropdown, escalator;
-	private Relay ddmotor;
-	public enum DDdir{UP, DOWN, STOP}
-	DDdir curDir;
-	Timer ddTimer;
+	final long MANUALTIMEOUT = 50;
+	
+	private SpeedController intake1, intake2;
+	
+	private CANTalon ddmotor;
+	private PIDController ddController;
+	private PIDCANTalonEncoderWrapper ddwrapper;
+	
+	private ManualHandler ddManual, intakeManual;
 	
 	private SubsystemTask task;
 	private Thread ddThread;
 	
-	public Intake(SpeedController dropdownin, SpeedController escalatorin, Relay ddmotorin)
+	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin)
 	{
-		dropdown = dropdownin;
-		escalator = escalatorin;
+		//Intake
+		intake1 = intake1in;
+		intake2 = intake2in;
 		ddmotor = ddmotorin;
-		curDir = DDdir.STOP;
-		ddTimer = new Timer();
-		ddTime = 0;
+		
+		ddwrapper = new PIDCANTalonEncoderWrapper(ddmotor, 1);
+		
+		//Dropdown
+		ddController = new PIDController(0, 0, 0, ddwrapper, ddmotor);
+		ddController.disable();
+		ddController.setOutputRange(-1, 1);
+		ddController.setToleranceBuffer(6);
+		
+		//Manuals
+		ddManual = new ManualHandler(MANUALTIMEOUT);
+		intakeManual = new ManualHandler(MANUALTIMEOUT);
+		
 		started = true;
 		done = true;
 		
+		
+		//Thread
 		task = new SubsystemTask(this, 10);
 		ddThread = new Thread(task, "ddThread");
 		ddThread.start();
@@ -54,26 +76,14 @@ public class Intake implements Subsystem
 		{
 			System.out.println("intaking " + params[0] + " at " + params[1] + "percent");
 			//Direction(sign(possibly 0)), percent speed, constant to invert if necessary and make timing correct
-			dropdown.set(params[0]*params[1]*SUCKMOTORSPEED/100);
-			escalator.set(params[0]*params[1]*LOADMOTORSPEED/100);
+			intake1.set(params[0]*params[1]*SUCKMOTORSPEED/100);
+			intake2.set(params[0]*params[1]*LOADMOTORSPEED/100);
 			done = true;
 		}
 		else if(command.equalsIgnoreCase("dropdown"))
 		{
 			switch((int)params[0])
 			{
-				case 1:
-					curDir = DDdir.UP;
-					break;
-				case 0:
-					curDir = DDdir.STOP;
-					setIntakeMovement(curDir);
-					done = true;
-					started = true;
-					break;
-				case -1:
-					curDir = DDdir.DOWN;
-					break;
 			}
 			ddTime = params[1];
 		}
@@ -93,16 +103,76 @@ public class Intake implements Subsystem
 
 	@Override
 	public synchronized void returnConstantRequest(double[] constantsin)
-	{ 
-		SUCKMOTORSPEED = constantsin[0];
-		LOADMOTORSPEED = constantsin[1];
-		FORWARDISDOWN = constantsin[2] == 1;
+	{
+		double 	prevDDdead = DDCONTROLDEAD,
+				prevDDp = DDCONTROLP,
+				prevDDi = DDCONTROLI,
+				prevDDd = DDCONTROLD;
+		
+		int i = 0;
+		SUCKMOTORSPEED = constantsin[i];
+		i++;//1
+		LOADMOTORSPEED = constantsin[i];
+		i++;//2
+		FORWARDISDOWN = constantsin[i] == 1;
+		i++;//3
+		INTAKE1DIR = constantsin[i];
+		i++;//4
+		INTAKE2DIR = constantsin[i];
+		i++;//5
+		DDCONTROLP = constantsin[i];
+		i++;//6
+		DDCONTROLI = constantsin[i];
+		i++;//7
+		DDCONTROLD = constantsin[i];
+		i++;//8
+		DDCONTROLDEAD = constantsin[i];
+		
+		if(	prevDDp != DDCONTROLP ||
+			prevDDi != DDCONTROLI || prevDDd != DDCONTROLD ||
+			prevDDdead != DDCONTROLDEAD)//different or null
+		{
+			String print = "Different constants: ";
+			print += prevDDp != DDCONTROLP ? "DDCONTROLP ": "";
+			print += prevDDi != DDCONTROLI ? "DDCONTROLI ": "";
+			print += prevDDd != DDCONTROLD ? "DDCONTROLD ": "";
+			print += prevDDdead != DDCONTROLDEAD ? "DDCONTROLDEAD": "";
+			System.out.println(print);
+			
+			ddController.setPID(DDCONTROLP, DDCONTROLI, DDCONTROLD);
+			ddController.setAbsoluteTolerance(DDCONTROLDEAD);
+		}
 	}
 
 	@Override
 	public synchronized void update()
 	{
-		if(!started && !done)
+		//======================
+		//========Intake========
+		//======================
+		if(intakeManual.isTimeUp())//no longer manual control - do tings
+		{
+			
+		}
+		else
+		{
+			//manual control
+		}
+		
+		//======================
+		//=======Dropdown=======
+		//======================
+		if(ddManual.isTimeUp())//no longer manual control - do tings
+		{
+			
+		}
+		else
+		{
+			//manual control
+		}
+		
+		
+		/*if(!started && !done)
 		{
 			ddTimer.reset();
 			ddTimer.start();
@@ -117,10 +187,10 @@ public class Intake implements Subsystem
 				ddTimer.stop();
 				setIntakeMovement(DDdir.STOP);
 			}
-		}
+		}*/
 	}
 	
-	public void setIntakeMovement(DDdir dir)
+	/*public void setIntakeMovement(DDdir dir)
 	{
 		Value forward = Relay.Value.kForward;
 		Value reverse = Relay.Value.kReverse;
@@ -137,6 +207,24 @@ public class Intake implements Subsystem
 				ddmotor.set(Relay.Value.kOff);
 				break;
 		}
+	}*/
+	
+	public void manualIntake(double speed)
+	{
+		intakeManual.poke();
+		setIntake(speed);
+	}
+	
+	private void setIntake(double speed)
+	{
+		intake1.set(speed*SUCKMOTORSPEED*INTAKE1DIR);
+		intake2.set(speed*SUCKMOTORSPEED*INTAKE2DIR);
+	}
+	
+	public void manualDropdown(double move)
+	{
+		ddManual.poke();
+		ddmotor.set(move);
 	}
 	
 	public String toString()
@@ -173,9 +261,9 @@ public class Intake implements Subsystem
 	@Override
 	public void end()
 	{
-		setIntakeMovement(DDdir.STOP);
-		dropdown.set(0);
-		escalator.set(0);
+		//setIntakeMovement(DDdir.STOP);
+		intake1.set(0);
+		intake2.set(0);
 	}
 	
 	@Override

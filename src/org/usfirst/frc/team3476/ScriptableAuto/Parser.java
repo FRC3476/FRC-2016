@@ -198,7 +198,15 @@ public class Parser
 			endOfLine = constants.length();
 		}
 		String sValue = constants.substring(keydex, endOfLine).trim();
-		return OrangeUtility.cleanDoubleParse(sValue);
+		
+		double result = OrangeUtility.cleanDoubleParse(sValue);
+		
+		if(key.equals("FLY1DIR"))
+		{
+			//System.out.println("FLY1DIR: " + sValue + ", result: " + result);
+		}
+		
+		return result;
 	}
 	
 	/**
@@ -233,11 +241,11 @@ public class Parser
 			String[] seperate = possYear.split(YEARSEPERATOR);
 			if(seperate[0].trim().equals(constantYear))
 			{
-				return seperate[1];
+				return OrangeUtility.removeSLComments(seperate[1], "//");
 			}
 		}
 		System.out.println("USING BACKUP CONSTANTS!!!!!!!!!!!!!!");
-		return BACKUPCONSTANTS;
+		return OrangeUtility.removeSLComments(BACKUPCONSTANTS, "//");
 	}
 	
 	/**
@@ -273,6 +281,8 @@ public class Parser
 	public void update(String scriptin, String constantsin)
 	{
 		script = scriptin;
-		constants = retrieveThisYear(constantsin);
+		String temp = retrieveThisYear(constantsin);
+		//if(!temp.equals(constants)) System.out.println("Constants different");
+		constants = temp;
 	}
 }

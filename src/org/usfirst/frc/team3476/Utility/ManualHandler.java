@@ -1,9 +1,9 @@
-package org.usfirst.frc.team3476.Main;
+package org.usfirst.frc.team3476.Utility;
 
 public class ManualHandler
 {
 	private long lastManualTime, timeThreshold;
-	private boolean nopoke;
+	private boolean first;
 	
 	/**
 	 * @param timeThresholdin the time threshold before considering this to be non manual
@@ -11,7 +11,7 @@ public class ManualHandler
 	public ManualHandler(long timeThresholdin)
 	{
 		timeThreshold = timeThresholdin;
-		nopoke = true;
+		lastManualTime = 0;
 	}
 	
 	/**
@@ -20,11 +20,24 @@ public class ManualHandler
 	 */
 	public boolean isTimeUp()
 	{
-		if(nopoke)
+		return (System.currentTimeMillis() - lastManualTime) > timeThreshold;
+	}
+	
+	/**
+	 * Returns true only the first time after a poke
+	 * @return
+	 */
+	public boolean first()
+	{
+		if(first)
 		{
+			first = false;
 			return true;
 		}
-		return (System.currentTimeMillis() - lastManualTime) > timeThreshold;
+		else
+		{
+			return false;
+		}
 	}
 	
 	/**
@@ -32,7 +45,7 @@ public class ManualHandler
 	 */
 	public void poke()
 	{
-		nopoke = false;
+		first = true;
 		lastManualTime = System.currentTimeMillis();
 	}
 }

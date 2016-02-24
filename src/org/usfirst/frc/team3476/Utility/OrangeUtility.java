@@ -2,10 +2,12 @@ package org.usfirst.frc.team3476.Utility;
 
 import java.util.List;
 
+import org.usfirst.frc.team3476.Utility.Control.ControlLoop;
+
 import edu.wpi.first.wpilibj.PIDController;
 
 public class OrangeUtility
-{
+{	
 	/**
 	 * Keeps a value in a range by truncating it.
 	 * @param toCoerce the value to coerce
@@ -24,6 +26,42 @@ public class OrangeUtility
 			return low;
 		}
 		return toCoerce;
+	}
+	
+	public static boolean inRange(double test, double a, double b)
+	{
+		return inRange(test, new double[]{a, b});
+	}
+
+	public static boolean inRange(double test, double[]range)
+	{
+		return test > getArrayMin(range) && test < getArrayMax(range);
+	}
+	
+	public static double getArrayMin(double[] array)
+	{
+		double result = array[0];
+		for(double e : array)
+		{
+			if(e < result)
+			{
+				result = e;
+			}
+		}
+		return result;
+	}
+	
+	public static double getArrayMax(double[] array)
+	{
+		double result = array[0];
+		for(double e : array)
+		{
+			if(e > result)
+			{
+				result = e;
+			}
+		}
+		return result;
 	}
 	
 	public static double normalize(double toNormalize, double fromHigh, double fromLow, double toHigh, double toLow)
@@ -63,9 +101,89 @@ public class OrangeUtility
 	 * @param mess the string to be parsed
 	 * @return the double value extracted from the string
 	 */
-	public static double cleanDoubleParse(String mess)
+	public static double cleanDoubleParse(String mess)//TODO: encapsulate special replaceall
 	{
-		return Double.parseDouble(mess.replaceAll("[^\\d.-]", ""));
+		String result = mess;
+		result = result.toUpperCase();
+		result = result.replaceAll("[^\\d.-E]", "");//remove all illegal characters
+		int e = result.indexOf("E");
+		if(e != -1)
+		{
+			String before = result.substring(0, e + 1), after = result.substring(e + 1);
+			before = removeExtraInstances(before, "\\.");
+			before = removeExtraInstances(before, "-");
+			after = removeExtraInstances(after, "\\.");
+			after = removeExtraInstances(after, "-");
+			
+			result = before + after;
+		}
+		else//no e
+		{
+			result = removeExtraInstances(result, "\\.");
+			result = removeExtraInstances(result, "-");
+		}
+		
+		return Double.parseDouble(result);
+	}
+	
+	/**
+	 * Removes all instances of toReplace after the first.
+	 * If toReplace does not occur, input is returned unchanged.
+	 * @param input the String to operate on
+	 * @param replaceRegex the regex to remove extra instances of
+	 * @return the resulting string
+	 */
+	public static String removeExtraInstances(String input, String replaceRegex)
+	{
+		int replacedex = input.indexOf(replaceRegex);
+		if(replacedex != -1)
+		{
+			return replaceAllPastIndex(input, replaceRegex, "", replacedex);
+		}
+		else
+		{
+			return input;
+		}
+	}
+	
+	/**
+	 * Calls input.replaceAll() on everything after the index
+	 * Precondition: 0 <= index < input.length
+	 * @param input the input String
+	 * @param regex the regex to be found
+	 * @param replacement the String to replace matching substrings
+	 * @param index the index to start at (non-inclusive)
+	 * @return the resulting string
+	 */
+	public static String replaceAllPastIndex(String input, String regex, String replacement, int index)
+	{
+		return input.substring(0, index + 1) + input.substring(index + 1).replaceAll(regex, replacement);
+	}
+	
+	/**
+	 * Removes single line comments
+	 * @param input the String to operate on
+	 * @param commentDelimiter the String that denotes a comment
+	 * @return the modified String
+	 */
+	public static String removeSLComments(String input, String commentDelimiter)
+	{
+		int comdex = input.indexOf(commentDelimiter);
+		int comend = input.indexOf("\n", comdex);
+		while(comdex != -1)
+		{
+			if(comend != -1)//comend
+			{
+				input = input.substring(0, comdex) + input.substring(comend);
+			}
+			else//comment abbuts end of string
+			{
+				input = input.substring(0, comdex);
+			}
+			comdex = input.indexOf(commentDelimiter);
+			comend = input.indexOf("\n", comdex);
+		}
+		return input;
 	}
 	
 	/**
@@ -75,11 +193,44 @@ public class OrangeUtility
 	 */
 	public static String PIDData(PIDController control)
 	{
-		String ret = "Enable: " + control.isEnabled();
-		ret += ",\nError: " + control.getError();
-		ret += ",\nCurrent: " + (control.getSetpoint() + control.getError());
-		ret += ",\nControl Value: " + control.get();
-		ret += "\n";
+		boolean enable = control.isEnabled(), tol = control.onTarget();
+		double error = control.getError(), process = control.getSetpoint() - control.getError(),
+				conval = control.get(), p = control.getP(), i = control.getI(), d = control.getD();
+		String ret = "Enable: " + enable;
+		ret += ",\nError: " + error;
+		ret += ",\nProcess: " + process;
+		ret += ",\nControl Value: " + conval;
+		ret += ",\nP: " + p;
+		ret += ",\nI: " + i;
+		ret += ",\nD: " + d;
+		ret += ",\nIn Tolerance: " + tol;
+		ret += "\n==============";
+		return ret;
+	}
+	
+	/**
+	 * Returns a string with all the parameters of the passed PID.
+	 * @param control the PIDController to get info from.
+	 * @return the info of the PIDController.
+	 */
+	public static String ControlLoopData(ControlLoop control, double process)
+	{
+		double error = control.getError(process), conval = control.output(process);
+		String ret = "==============";
+		ret += "\nError: " + error;
+		ret += ",\nProcess: " + process;
+		ret += ",\nControl Value: " + conval;
+		ret += "\n==============";
+		return ret;
+	}
+	
+	public static String ControlData(double error, double process, double output)
+	{
+		String ret = "==============";
+		ret += "\nError: " + error;
+		ret += ",\nProcess: " + process;
+		ret += ",\nControl Value: " + output;
+		ret += "\n==============";
 		return ret;
 	}
 	
@@ -112,4 +263,10 @@ public class OrangeUtility
         }
         return sb.toString();
     }
+	
+	public static boolean doubleEqual(double a, double b)
+	{
+		double epsilon = 1E-14;
+		return Math.abs(a-b) < epsilon;
+	}
 }

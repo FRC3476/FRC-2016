@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Utility.Control;
 
+import java.util.Arrays;
+
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 public abstract class ControlLoop
@@ -43,5 +45,12 @@ public abstract class ControlLoop
 	public double getError(double process)
 	{
 		return setpoint - process;
+	}
+	
+	@Override
+	public boolean equals(Object other)
+	{
+		if(other == null) return false;
+		return Arrays.equals(this.outputrange, ((ControlLoop)other).outputrange);
 	}
 }

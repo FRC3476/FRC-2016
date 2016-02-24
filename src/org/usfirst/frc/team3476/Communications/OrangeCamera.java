@@ -418,7 +418,7 @@ public class OrangeCamera {
           consecutiveErrors++;
 
           if (consecutiveErrors > 5) {
-            e.printStackTrace();
+           // e.printStackTrace();
           }
         }
 
