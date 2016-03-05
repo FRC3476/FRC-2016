@@ -3,6 +3,7 @@ package org.usfirst.frc.team3476.Subsystems;
 
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.ManualHandler;
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 
 import edu.wpi.first.wpilibj.CANTalon;
@@ -16,7 +17,7 @@ public class Intake implements Subsystem
 {
 	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP, DDCONTROLI, DDCONTROLD, DDCONTROLDEAD, DDCONTROLOUTPUTHIGH, DDCONTROLOUTPUTLOW;
 	final String[] autoCommands = {"intake", "dropdown"};
-	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD", "DDCONTROLOUTPUTHIGH"};
+	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD", "DDCONTROLOUTPUTHIGH", "DDCONTROLOUTPUTLOW"};
 	private boolean done, FORWARDISDOWN, started;
 	
 	final long MANUALTIMEOUT = 50;
@@ -32,6 +33,7 @@ public class Intake implements Subsystem
 	private SubsystemTask task;
 	private Thread ddThread;
 	private double ddPosition, lastposition;
+	private boolean stopdd;
 	
 	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin)
 	{
@@ -49,6 +51,7 @@ public class Intake implements Subsystem
 		ddController.disable();
 		ddController.setOutputRange(0, 0);
 		ddController.setToleranceBuffer(6);
+		stopdd = false;
 		
 		//Manuals
 		ddManual = new ManualHandler(MANUALTIMEOUT);
@@ -134,6 +137,8 @@ public class Intake implements Subsystem
 		DDCONTROLDEAD = constantsin[i];
 		i++;//9
 		DDCONTROLOUTPUTHIGH = constantsin[i];
+		i++;//9
+		DDCONTROLOUTPUTLOW = constantsin[i];
 		
 		if(	prevDDp != DDCONTROLP ||
 			prevDDi != DDCONTROLI || prevDDd != DDCONTROLD ||
@@ -175,14 +180,24 @@ public class Intake implements Subsystem
 		//======================
 		if(ddManual.isTimeUp())//no longer manual control - do tings
 		{
-			if(ddPosition != lastposition)
+			if(!stopdd)
 			{
-				System.out.println("NEW POS");
 				if(!ddController.isEnabled())
 				{
 					ddController.enable();
 				}
-				ddController.setSetpoint(ddPosition);
+				
+				if(ddPosition != lastposition)
+				{
+					ddController.setSetpoint(ddPosition);
+				}
+			}
+			else
+			{
+				if(ddController.isEnabled())
+				{
+					ddController.disable();
+				}
 			}
 		}
 		else//manual control
@@ -232,6 +247,11 @@ public class Intake implements Subsystem
 		}
 	}*/
 	
+	public void stopDD()
+	{
+		stopdd = true;
+	}
+	
 	public void printPID()
 	{
 		String print = "Different constants: ";
@@ -249,6 +269,7 @@ public class Intake implements Subsystem
 	
 	public void moveDropdown(double position)
 	{
+		stopdd = false;
 		ddPosition = position;
 	}
 	

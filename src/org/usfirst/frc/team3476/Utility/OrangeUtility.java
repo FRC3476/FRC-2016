@@ -1,5 +1,6 @@
 package org.usfirst.frc.team3476.Utility;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -199,6 +200,16 @@ public class OrangeUtility
 	 */
 	public static String PIDData(PIDController control)
 	{
+		return PIDData(control, 0, 0);
+	}
+	
+	/**
+	 * Returns a string with all the parameters of the passed PID.
+	 * @param control the PIDController to get info from.
+	 * @return the info of the PIDController.
+	 */
+	public static String PIDData(PIDController control, double outlow, double outhigh)
+	{
 		boolean enable = control.isEnabled(), tol = control.onTarget();
 		double error = control.getError(), process = control.getSetpoint() - control.getError(),
 				conval = control.get(), p = control.getP(), i = control.getI(), d = control.getD();
@@ -209,6 +220,7 @@ public class OrangeUtility
 		ret += ",\nP: " + p;
 		ret += ",\nI: " + i;
 		ret += ",\nD: " + d;
+		if(outlow != 0 || outhigh != 0) ret += ",\nOutput Range: " + Arrays.toString(new double[]{outlow, outhigh});
 		ret += ",\nIn Tolerance: " + tol;
 		ret += "\n==============";
 		return ret;

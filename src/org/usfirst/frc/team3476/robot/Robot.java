@@ -26,6 +26,7 @@ import org.usfirst.frc.team3476.Subsystems.*;
 import org.usfirst.frc.team3476.Subsystems.Drive.ShiftingState;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Toggle;
+import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialSPIGyro;
 import org.usfirst.frc.team3476.Utility.Control.DonutCANTalon;
@@ -92,7 +93,7 @@ public class Robot extends IterativeRobot
     MedianEncoder leftDrive = new MedianEncoder(10, 11, false, EncodingType.k4X, 5);
     MedianEncoder rightDrive = new MedianEncoder(12, 13, true, EncodingType.k4X, 5);
     
-    DigitalInput loaderSwitch = new DigitalInput(5), halleffect = new DigitalInput(0);//TODO: ensure switch channel at a later time
+    DigitalInput halleffect = new DigitalInput(0);//TODO: ensure switch channel at a later time
     
     Main main;
     Subsystem[] systems;
@@ -100,7 +101,9 @@ public class Robot extends IterativeRobot
     //Gyro analoggyro = new DifferentialAnalogGyro(0, 5);//TODO: replace with spi
     Gyro spiGyro = new DifferentialSPIGyro(SPI.Port.kOnboardCS0, 5);
     
-    AnalogInput pressure = new AnalogInput(3);
+    AnalogInput pressure = new AnalogInput(3), ballsensor = new AnalogInput(2);
+    
+    AtoD loaderSwitch = new AtoD(ballsensor, 2.3);
     
     DigitalInput banner = new DigitalInput(1);//comp is 1, program is 9
     PIDCounterPeriodWrapper tach = new PIDCounterPeriodWrapper(banner, 60);
@@ -142,6 +145,7 @@ public class Robot extends IterativeRobot
     	turretMotor.setSafetyEnabled(false);
     	loaderTalon.setInverted(true);
     	flyTalon2.setInverted(true);
+    	new PIDCANTalonEncoderWrapper(ddmotor, 1).reset();
     	
     	if(!automatic)
     	{
@@ -257,9 +261,10 @@ public class Robot extends IterativeRobot
     {
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
-    		boolean axisprint = false, turretgo = true, buttons = false, tachprint = false, currentprint = false,
-    				pressureprint = false, driveencoderprint = false, spigyroprint = false,
-    				intakeenc = false, shooterout = false;
+    		boolean axisprint = false, turretgo = true, buttons = false, tachprint = false,
+    				currentprint = false, pressureprint = false, driveencoderprint = false,
+    				spigyroprint = false, intakeenc = false, shooterout = false,
+    				ballsensorprint = true;
     		
     		Drive drive = (Drive)systems[0];
     		Turret turret = (Turret)systems[1];
@@ -287,7 +292,7 @@ public class Robot extends IterativeRobot
 			    			turret.resetHomer();
 			    			homed = true;
 			    		}
-						intake.getIntakeEncoder().reset();
+						intake.moveDropdown(20);
 					}
 					else
 					{
@@ -359,69 +364,32 @@ public class Robot extends IterativeRobot
 	    				{
 	    					turret.manualTurret(joy.getAxis(AxisType.kX));//xaxis
 	    				}
-		    			
-	    				if (joy.getRawButton(3))
-		    			{
-		    				System.out.println("encoder: " + encoder.get() + ", " + encoder.getDistance() + 
-		    						" - soft: " + turret.getSoftLimits() + ", " + turret.getSoftDir());
-		    				System.out.println("Joy val: " + joy.getAxis(AxisType.kX));
-		    			}
 	    				
-		    			double FLYWHEELMAX = 8500;
+		    			double FLYWHEELMAX = 8900;
 		    			
 		    			//shooter.manualShooter((-joy.getRawAxis(3)+1)/2);//throttle
 		    			//shooter.manualShooter(0);
 		    			shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
 		    			
-		    			if(joy.getRawButton(8))
-		    			{
-		    				shooter.setFly(0);
-		    			}
-		    			else if(joy.getRawButton(9))
-		    			{
-		    				shooter.setFly(3000);
-		    			}
-		    			else if(joy.getRawButton(10))
-		    			{
-		    				shooter.setFly(6000);
-		    			}
+	    				shooter.setFly(((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
 		    			
-		    			/*if(joy.getRawButton(2))
-		    			{
-		    				shooter.setFly(((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
-		    			}
-		    			else
-		    			{
-		    				shooter.setFly(0);
-		    			}*/
+		    			double up = 20, horiz = 4310, down = 5230;
 		    			
-		    			double up = 300, horiz = 4000, down = 5000;
+	    				if(joy.getRawButton(7))
+	    				{
+	    					intake.moveDropdown(up);
+	    				}
+	    				else if(joy.getRawButton(9))
+	    				{
+	    					intake.moveDropdown(horiz);
+	    				}
+	    				else if(joy.getRawButton(11))
+	    				{
+	    					intake.moveDropdown(down);
+	    				}
 		    			
-		    			boolean magic = false;
-		    			
-		    			if(magic)
-		    			{
-			    			if(joy.getRawButton(7))
-			    			{
-			    				if(-joy.getRawAxis(3) < -0.5)
-			    				{
-			    					intake.moveDropdown(down);
-			    				}
-			    				else if(-joy.getRawAxis(3) < 0.25 && -joy.getRawAxis(3) > -0.5)
-			    				{
-			    					intake.moveDropdown(horiz);
-			    				}
-			    				else if(-joy.getRawAxis(3) > 0.25)
-			    				{
-			    					intake.moveDropdown(up);
-			    				}
-			    			}
-		    			}
-		    			else
-		    			{
-		    				intake.manualDropdown(joy.getRawAxis(1));//yaxis
-		    			}
-		    			
+	    				
+	    				
 		    			if(joy.getRawButton(3))
 	    				{
 	    					intake.manualIntake(1);
@@ -445,7 +413,7 @@ public class Robot extends IterativeRobot
 		    			
 		    			shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
 		    			
-		    			hoodToggle.input(joy.getRawButton(11));
+		    			hoodToggle.input(joy.getRawButton(12));
 	    				hood.set(hoodToggle.get());
     				}
 	    			else//manual
@@ -500,12 +468,17 @@ public class Robot extends IterativeRobot
 						}
 	    				intake.manualDropdown(joy.getRawAxis(1));//yaxis
 	    				
-	    				hoodToggle.input(joy.getRawButton(11));
+	    				hoodToggle.input(joy.getRawButton(12));
 	    				hood.set(hoodToggle.get());
 	    				
 	    				//drive.setShifterState(xbox.getRawAxis(3) > 0.5 ? ShiftingState.HIGH : ShiftingState.LOW);
 	    				
 	    				//System.out.println("Banner: " + banner.get());
+	    			}
+	    			
+	    			if(ballsensorprint)
+	    			{
+	    				System.out.println("Voltage: " + ballsensor.getVoltage() + ", AtoD Value: " + loaderSwitch.above());
 	    			}
 	    			
 	    			if(currentprint)
@@ -520,7 +493,7 @@ public class Robot extends IterativeRobot
 	    			
 	    			if(intakeenc)
 	    			{
-	    				intake.printPID();
+	    				System.out.println("Encoder: " + intake.getIntakeEncoder().getDistance());
 	    			}
 	    			
 	    			if(spigyroprint)

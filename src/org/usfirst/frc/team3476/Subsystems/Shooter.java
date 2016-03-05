@@ -9,6 +9,7 @@ import org.usfirst.frc.team3476.Utility.DIOHomer.HomeState;
 import org.usfirst.frc.team3476.Utility.ManualHandler;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
+import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDCounterPeriodWrapper;
@@ -65,7 +66,7 @@ public class Shooter implements Subsystem
 	private PIDController flywheelcontrol;
 	private PIDMotorGroup flygroup;
 	
-	private DigitalInput loaderSwitch;
+	private AtoD loaderSwitch;
 	
 	private SubsystemTask task;
 	private Thread shooterThread;
@@ -86,7 +87,7 @@ public class Shooter implements Subsystem
 	
 	
 	public Shooter(	SpeedController fly1in, SpeedController fly2in, SpeedController loaderin,
-					Turret turretin, PIDCounterPeriodWrapper tachin, DigitalInput loaderSwitchin)
+					Turret turretin, PIDCounterPeriodWrapper tachin, AtoD loaderSwitchin)
 	{
 		turret = turretin;
 		
@@ -278,12 +279,6 @@ public class Shooter implements Subsystem
 				flywheelcontrol.setSetpoint(flyset);
 			}
 			
-			if(iters % 20 == 0)
-			{
-				System.out.println(OrangeUtility.PIDData(flywheelcontrol));
-			}
-			
-			
 			/*if(control == null)
 			{
 				throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
@@ -320,7 +315,7 @@ public class Shooter implements Subsystem
 		//======================
 		//========Loader========
 		//======================
-		boolean ballsw = loaderSwitch.get();
+		boolean ballsw = loaderSwitch.above();
 		if(loaderManual.isTimeUp())
 		{
 			switch(loaderState)
