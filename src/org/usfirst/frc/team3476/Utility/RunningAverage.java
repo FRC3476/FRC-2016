@@ -60,4 +60,24 @@ public class RunningAverage implements PIDSource
 
 	@Override
 	public PIDSourceType getPIDSourceType(){return PIDSourceType.kDisplacement;}
+	
+	public void setNumValues(int numValues)
+	{
+		this.numValues = numValues;
+		//remove extra values
+		while(values.size() > this.numValues)
+		{
+			values.remove(0);
+		}
+	}
+	
+	public int size()
+	{
+		return values.size();
+	}
+	
+	public boolean isFull()
+	{
+		return values.size() >= numValues;
+	}
 }

@@ -282,7 +282,7 @@ public class Parser
 	{
 		script = scriptin;
 		String temp = retrieveThisYear(constantsin);
-		//if(!temp.equals(constants)) System.out.println("Constants different");
+		if(!temp.equals(constants)) System.out.println("Constants different");
 		constants = temp;
 	}
 }

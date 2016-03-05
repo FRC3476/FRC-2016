@@ -29,6 +29,17 @@ public class PIDDashdataWrapper implements PIDSource
 				return 0;
 		}
 	}
+	
+	public boolean checkFrame()
+	{
+		boolean newframe = Dashcomm.getBoolean("data/newframe", false);
+		if(newframe)
+		{
+			Dashcomm.putBoolean("data/newframe", false);
+			return true;
+		}
+		return false;
+	}
 
 	@Override
 	public void setPIDSourceType(PIDSourceType pidSource){}

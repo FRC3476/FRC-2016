@@ -5,8 +5,9 @@ import java.util.Arrays;
 import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.PIDSource;
+import edu.wpi.first.wpilibj.interfaces.Gyro;
 
-public class DifferentialAnalogGyro extends AnalogGyro implements PIDSource
+public class DifferentialAnalogGyro extends AnalogGyro
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;

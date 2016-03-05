@@ -11,9 +11,11 @@ import org.usfirst.frc.team3476.Utility.Control.MedianEncoderPair;
 import org.usfirst.frc.team3476.Utility.Control.PIDOutputWrapper;
 
 import edu.wpi.first.wpilibj.PIDController;
+import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.RobotDrive;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.interfaces.Gyro;
 
 public class Drive implements Subsystem
 {
@@ -31,7 +33,7 @@ public class Drive implements Subsystem
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
-	private DifferentialAnalogGyro gyro;
+	private Gyro gyro;
 	private RunningAverage encoderAvg, avgRate;
 	private RobotDrive driveTrain;
 	private Solenoid shifters;
@@ -49,7 +51,7 @@ public class Drive implements Subsystem
 	Timer doneTimer;
 	Timer mainTimer;
 	
-	public Drive(MedianEncoder leftin, MedianEncoder rightin, DifferentialAnalogGyro gyroin, RobotDrive driveTrainin, Solenoid shiftersin)
+	public Drive(MedianEncoder leftin, MedianEncoder rightin, Gyro gyroin, RobotDrive driveTrainin, Solenoid shiftersin)
 	{
 		done = true;
 		driveStraight = true;
@@ -83,12 +85,12 @@ public class Drive implements Subsystem
 		
 		//Turn PID
 		turnWrapper = new PIDOutputWrapper(true);
-		turn = new PIDController(0, 0, 0, gyro, turnWrapper);
+		turn = new PIDController(0, 0, 0, (PIDSource)gyro, turnWrapper);
 		turn.disable();
 		
 		//Drivestraight PID
 		straightWrapper = new PIDOutputWrapper(true);
-		straightTurn = new PIDController(0, 0, 0, gyro, straightWrapper);
+		straightTurn = new PIDController(0, 0, 0, (PIDSource)gyro, straightWrapper);
 		straightTurn.disable();
 		
 		driven = new BangBang(new double[]{0, 0});

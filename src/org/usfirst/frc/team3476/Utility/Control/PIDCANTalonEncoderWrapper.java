@@ -1,10 +1,7 @@
 package org.usfirst.frc.team3476.Utility.Control;
 
-import org.omg.IOP.ENCODING_CDR_ENCAPS;
-
 import edu.wpi.first.wpilibj.CANTalon;
 import edu.wpi.first.wpilibj.CounterBase;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.PIDSourceType;
 

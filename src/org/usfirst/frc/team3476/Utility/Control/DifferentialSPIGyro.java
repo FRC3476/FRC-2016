@@ -3,12 +3,9 @@ package org.usfirst.frc.team3476.Utility.Control;
 import java.util.Arrays;
 
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
-import edu.wpi.first.wpilibj.AnalogGyro;
-import edu.wpi.first.wpilibj.AnalogInput;
-import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.SPI;
 
-public class DifferentialSPIGyro extends ADXRS450_Gyro implements PIDSource
+public class DifferentialSPIGyro extends ADXRS450_Gyro
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;
@@ -40,6 +37,12 @@ public class DifferentialSPIGyro extends ADXRS450_Gyro implements PIDSource
 	@Override
 	public double pidGet()
 	{
+		return getAngle();
+	}
+	
+	@Override
+	public double getAngle()
+	{
 		return calcDiff();
 	}
 	
@@ -47,9 +50,9 @@ public class DifferentialSPIGyro extends ADXRS450_Gyro implements PIDSource
 	{
 		double[] data = new double[samples];
 		
-		for(int i = 0; i < data.length; i++)
+		for(int i = 0; i < samples; i++)
 		{
-			data[i] = getAngle();
+			data[i] = super.getAngle();
 		}
 		
 		Arrays.sort(data);

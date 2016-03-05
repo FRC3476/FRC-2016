@@ -11,6 +11,7 @@ public class SubsystemTask extends SafeTask
 	{
 		super(minTime);
 		system = systemin;
+		setPrePrint("System {%s}", system);
 	}
 
 	@Override

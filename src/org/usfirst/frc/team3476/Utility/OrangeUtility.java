@@ -1,6 +1,8 @@
 package org.usfirst.frc.team3476.Utility;
 
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.usfirst.frc.team3476.Utility.Control.ControlLoop;
 
@@ -89,6 +91,10 @@ public class OrangeUtility
 	 */
 	public static double donut(double toDonut, double threshold)
 	{
+		if(toDonut == 0)
+		{
+			return 0;
+		}
 		if(toDonut > 0)
 		{
 			return toDonut + threshold;
@@ -105,7 +111,7 @@ public class OrangeUtility
 	{
 		String result = mess;
 		result = result.toUpperCase();
-		result = result.replaceAll("[^\\d.-E]", "");//remove all illegal characters
+		result = result.replaceAll("[^\\d.\\-E]", "");//remove all illegal characters
 		int e = result.indexOf("E");
 		if(e != -1)
 		{
@@ -135,10 +141,10 @@ public class OrangeUtility
 	 */
 	public static String removeExtraInstances(String input, String replaceRegex)
 	{
-		int replacedex = input.indexOf(replaceRegex);
-		if(replacedex != -1)
+		Matcher match = Pattern.compile(replaceRegex).matcher(input);
+		if(match.find())
 		{
-			return replaceAllPastIndex(input, replaceRegex, "", replacedex);
+			return replaceAllPastIndex(input, replaceRegex, "", match.start());
 		}
 		else
 		{

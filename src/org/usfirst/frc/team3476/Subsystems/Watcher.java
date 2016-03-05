@@ -11,12 +11,12 @@ public class Watcher implements Subsystem
 	SubsystemTask watcherTask;
 	boolean watch;
 	
-	public Watcher(Subsystem[] systemsin)
+	public Watcher(Subsystem[] systemsin, int exectime)
 	{
 		systems = systemsin;
 		
 		watch = true;
-		watcherTask = new SubsystemTask(this, 1);
+		watcherTask = new SubsystemTask(this, exectime);
 		watcherThread = new Thread(watcherTask, "watcherThread");
 		watcherThread.start();
 	}
@@ -41,7 +41,7 @@ public class Watcher implements Subsystem
 	{
 		if(watch)
 		{
-			CANTalon turret = ((Shooter)systems[1]).getTurretMotor();
+			CANTalon turret = ((Turret)systems[1]).getTurretMotor();
 			System.out.println("turretMotor: " + turret.get());
 		}
 	}

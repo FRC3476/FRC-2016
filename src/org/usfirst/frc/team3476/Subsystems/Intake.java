@@ -14,9 +14,9 @@ import edu.wpi.first.wpilibj.Timer;
 
 public class Intake implements Subsystem
 {
-	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP, DDCONTROLI, DDCONTROLD, DDCONTROLDEAD;
+	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP, DDCONTROLI, DDCONTROLD, DDCONTROLDEAD, DDCONTROLOUTPUTHIGH, DDCONTROLOUTPUTLOW;
 	final String[] autoCommands = {"intake", "dropdown"};
-	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD"};
+	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD", "DDCONTROLOUTPUTHIGH"};
 	private boolean done, FORWARDISDOWN, started;
 	
 	final long MANUALTIMEOUT = 50;
@@ -31,6 +31,7 @@ public class Intake implements Subsystem
 	
 	private SubsystemTask task;
 	private Thread ddThread;
+	private double ddPosition, lastposition;
 	
 	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin)
 	{
@@ -42,9 +43,11 @@ public class Intake implements Subsystem
 		ddwrapper = new PIDCANTalonEncoderWrapper(ddmotor, 1);
 		
 		//Dropdown
+		ddPosition = 0;
+		lastposition = 0;
 		ddController = new PIDController(0, 0, 0, ddwrapper, ddmotor);
 		ddController.disable();
-		ddController.setOutputRange(-1, 1);
+		ddController.setOutputRange(0, 0);
 		ddController.setToleranceBuffer(6);
 		
 		//Manuals
@@ -107,7 +110,9 @@ public class Intake implements Subsystem
 		double 	prevDDdead = DDCONTROLDEAD,
 				prevDDp = DDCONTROLP,
 				prevDDi = DDCONTROLI,
-				prevDDd = DDCONTROLD;
+				prevDDd = DDCONTROLD,
+				prevDDouthigh = DDCONTROLOUTPUTHIGH,
+				prevDDoutlow = DDCONTROLOUTPUTLOW;
 		
 		int i = 0;
 		SUCKMOTORSPEED = constantsin[i];
@@ -127,20 +132,26 @@ public class Intake implements Subsystem
 		DDCONTROLD = constantsin[i];
 		i++;//8
 		DDCONTROLDEAD = constantsin[i];
+		i++;//9
+		DDCONTROLOUTPUTHIGH = constantsin[i];
 		
 		if(	prevDDp != DDCONTROLP ||
 			prevDDi != DDCONTROLI || prevDDd != DDCONTROLD ||
-			prevDDdead != DDCONTROLDEAD)//different or null
+			prevDDdead != DDCONTROLDEAD || prevDDouthigh != DDCONTROLOUTPUTHIGH ||
+			prevDDoutlow != DDCONTROLOUTPUTLOW)//different or null
 		{
 			String print = "Different constants: ";
 			print += prevDDp != DDCONTROLP ? "DDCONTROLP ": "";
 			print += prevDDi != DDCONTROLI ? "DDCONTROLI ": "";
 			print += prevDDd != DDCONTROLD ? "DDCONTROLD ": "";
-			print += prevDDdead != DDCONTROLDEAD ? "DDCONTROLDEAD": "";
+			print += prevDDdead != DDCONTROLDEAD ? "DDCONTROLDEAD ": "";
+			print += prevDDouthigh != DDCONTROLOUTPUTHIGH ? "DDCONTROLOUTPUTHIGH ": "";
+			print += prevDDoutlow != DDCONTROLOUTPUTLOW ? "DDCONTROLOUTPUTLOW": "";
 			System.out.println(print);
 			
 			ddController.setPID(DDCONTROLP, DDCONTROLI, DDCONTROLD);
 			ddController.setAbsoluteTolerance(DDCONTROLDEAD);
+			ddController.setOutputRange(DDCONTROLOUTPUTLOW, DDCONTROLOUTPUTHIGH);
 		}
 	}
 
@@ -164,11 +175,22 @@ public class Intake implements Subsystem
 		//======================
 		if(ddManual.isTimeUp())//no longer manual control - do tings
 		{
-			
+			if(ddPosition != lastposition)
+			{
+				System.out.println("NEW POS");
+				if(!ddController.isEnabled())
+				{
+					ddController.enable();
+				}
+				ddController.setSetpoint(ddPosition);
+			}
 		}
-		else
+		else//manual control
 		{
-			//manual control
+			if(ddController.isEnabled())
+			{
+				ddController.disable();
+			}
 		}
 		
 		
@@ -188,6 +210,7 @@ public class Intake implements Subsystem
 				setIntakeMovement(DDdir.STOP);
 			}
 		}*/
+		lastposition = ddPosition;
 	}
 	
 	/*public void setIntakeMovement(DDdir dir)
@@ -208,6 +231,26 @@ public class Intake implements Subsystem
 				break;
 		}
 	}*/
+	
+	public void printPID()
+	{
+		String print = "Different constants: ";
+		print += "DDCONTROLP " + DDCONTROLP + " ";
+		print += "DDCONTROLI " + DDCONTROLI + " ";
+		print += "DDCONTROLD " + DDCONTROLD + " ";
+		print += "DDCONTROLDEAD " + DDCONTROLDEAD;
+		System.out.println(print);
+	}
+	
+	public PIDCANTalonEncoderWrapper getIntakeEncoder()
+	{
+		return ddwrapper;
+	}
+	
+	public void moveDropdown(double position)
+	{
+		ddPosition = position;
+	}
 	
 	public void manualIntake(double speed)
 	{
