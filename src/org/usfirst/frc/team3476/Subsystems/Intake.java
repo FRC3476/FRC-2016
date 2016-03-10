@@ -8,6 +8,7 @@ import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 
 import edu.wpi.first.wpilibj.CANTalon;
 import edu.wpi.first.wpilibj.PIDController;
+import edu.wpi.first.wpilibj.PowerDistributionPanel;
 import edu.wpi.first.wpilibj.Relay;
 import edu.wpi.first.wpilibj.Relay.Value;
 import edu.wpi.first.wpilibj.SpeedController;
@@ -15,9 +16,16 @@ import edu.wpi.first.wpilibj.Timer;
 
 public class Intake implements Subsystem
 {
-	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP, DDCONTROLI, DDCONTROLD, DDCONTROLDEAD, DDCONTROLOUTPUTHIGH, DDCONTROLOUTPUTLOW;
+	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP,
+	DDCONTROLI, DDCONTROLD, DDCONTROLDEAD, DDCONTROLOUTPUTHIGH, DDCONTROLOUTPUTLOW, DDCHANNEL,
+	INTAKEHOMINGCURRENT, INTAKEHOMINGSPEED, DEFAULTDROPDOWNPOS;
+	
 	final String[] autoCommands = {"intake", "dropdown"};
-	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR", "INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD", "DDCONTROLOUTPUTHIGH", "DDCONTROLOUTPUTLOW"};
+	final String[] constants = {"SUCKMOTORSPEED", "LOADMOTORSPEED", "FORWARDISDOWN", "INTAKE1DIR",
+			"INTAKE2DIR", "DDCONTROLP", "DDCONTROLI", "DDCONTROLD", "DDCONTROLDEAD",
+			"DDCONTROLOUTPUTHIGH", "DDCONTROLOUTPUTLOW", "DDCHANNEL", "INTAKEHOMINGCURRENT",
+			"INTAKEHOMINGSPEED", "DEFAULTDROPDOWNPOS"};
+	
 	private boolean done, FORWARDISDOWN, started;
 	
 	final long MANUALTIMEOUT = 50;
@@ -27,6 +35,7 @@ public class Intake implements Subsystem
 	private CANTalon ddmotor;
 	private PIDController ddController;
 	private PIDCANTalonEncoderWrapper ddwrapper;
+	private PowerDistributionPanel pdPanel;
 	
 	private ManualHandler ddManual, intakeManual;
 	
@@ -34,9 +43,12 @@ public class Intake implements Subsystem
 	private Thread ddThread;
 	private double ddPosition, lastposition;
 	private boolean stopdd;
-	
-	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin)
+	private boolean homed;
+
+	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin, PowerDistributionPanel pdPanelin)
 	{
+		pdPanel = pdPanelin;
+		
 		//Intake
 		intake1 = intake1in;
 		intake2 = intake2in;
@@ -52,6 +64,7 @@ public class Intake implements Subsystem
 		ddController.setOutputRange(0, 0);
 		ddController.setToleranceBuffer(6);
 		stopdd = false;
+		homed  = false;
 		
 		//Manuals
 		ddManual = new ManualHandler(MANUALTIMEOUT);
@@ -137,8 +150,16 @@ public class Intake implements Subsystem
 		DDCONTROLDEAD = constantsin[i];
 		i++;//9
 		DDCONTROLOUTPUTHIGH = constantsin[i];
-		i++;//9
+		i++;//10
 		DDCONTROLOUTPUTLOW = constantsin[i];
+		i++;//11
+		DDCHANNEL = constantsin[i];
+		i++;//12
+		INTAKEHOMINGCURRENT = constantsin[i];
+		i++;//13
+		INTAKEHOMINGSPEED = constantsin[i];
+		i++;//14
+		DEFAULTDROPDOWNPOS = constantsin[i];
 		
 		if(	prevDDp != DDCONTROLP ||
 			prevDDi != DDCONTROLI || prevDDd != DDCONTROLD ||
@@ -180,23 +201,46 @@ public class Intake implements Subsystem
 		//======================
 		if(ddManual.isTimeUp())//no longer manual control - do tings
 		{
-			if(!stopdd)
+			if(homed)
 			{
-				if(!ddController.isEnabled())
+				if(!stopdd)
 				{
-					ddController.enable();
+					if(!ddController.isEnabled())
+					{
+						ddController.enable();
+					}
+					
+					if(ddPosition != lastposition)
+					{
+						ddController.setSetpoint(ddPosition);
+					}
+					lastposition = ddPosition;
 				}
-				
-				if(ddPosition != lastposition)
+				else
 				{
-					ddController.setSetpoint(ddPosition);
+					if(ddController.isEnabled())
+					{
+						ddController.disable();
+					}
 				}
 			}
-			else
+			else//homing
 			{
 				if(ddController.isEnabled())
 				{
 					ddController.disable();
+				}
+				
+				if(pdPanel.getCurrent((int)DDCHANNEL) > INTAKEHOMINGCURRENT)
+				{
+					ddmotor.set(0);
+					ddwrapper.reset();
+					moveDropdown(DEFAULTDROPDOWNPOS);
+					homed = true;
+				}
+				else
+				{
+					ddmotor.set(INTAKEHOMINGSPEED);
 				}
 			}
 		}
@@ -225,7 +269,6 @@ public class Intake implements Subsystem
 				setIntakeMovement(DDdir.STOP);
 			}
 		}*/
-		lastposition = ddPosition;
 	}
 	
 	/*public void setIntakeMovement(DDdir dir)
@@ -247,9 +290,19 @@ public class Intake implements Subsystem
 		}
 	}*/
 	
+	public double getDDSet()
+	{
+		return ddController.getSetpoint();
+	}
+	
 	public void stopDD()
 	{
 		stopdd = true;
+	}
+	
+	public boolean intakeRunning()
+	{
+		return intake1.get() != 0 || intake2.get() != 0;
 	}
 	
 	public void printPID()

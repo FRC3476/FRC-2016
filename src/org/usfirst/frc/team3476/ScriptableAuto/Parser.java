@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 /**
- * Parses a scriptable autonomous script with a constants file.
+ * Parses a scriptable autonomous workingScript with a constants file.
  * @author Anthony Demetrescu
  *
  */
@@ -17,46 +17,53 @@ public class Parser
 	final String BACKUPCONSTANTS = "//Driving deadzones\nDRIVEDEAD = 2\nDRIVESTRAIGHTDEAD = 5\nTURNDEAD = 5\n\n//encoders\nUSELEFT = 1\nUSERIGHT = 1\n\n//Drivestraight PID\nSTRAIGHTP = 1.5\nSTRAIGHTI = 0\nSTRAIGHTD = 0.001\n\n//Drive PID\nDRIVEP = 1.3\nDRIVEI = 0.005\nDRIVED = 0\n\n//Turn PID\nTURNP = 1.7\nTURNI = 0.005\nTURND = 0\n\n//Intake constants\nSUCKMOTORSPEED = -1\nLOADMOTORSPEED = -1\nFORWARDISDOWN = 0 //false\nAIMUPPOWERED = 1 //true\n\n//Shooter constants\nSHOOTEROUTPUTRANGEHIGH = 1\nSHOOTEROUTPUTRANGELOW = -1\nSHOOTERIGAIN = 0.00001\nFLY1DIR = -1\nFLY2DIR = 1\nFLY3DIR = -1\nFLY4DIR = 1\nGRABFRISBEETIME = 0.65\nSHOOTFRISBEETIME = 0.33\nFLYWHEELDEAD = 100\nFLYWHEELMAXSPEED = 3000";
 	
 	final String PARALLELSEPARATOR = ";", CONSTANTSSEPERATOR = "\u001B", YEARSEPERATOR = "~", FIRSTPARAM = ":", SECONDPARAM = "@", THEN = ">";
-	String script;
+	String workingScript, script;
 	String constants;
 	String constantYear;
 	
 	/**
-	 * Constructor that takes a script, constants files String, and a year identifier String.
-	 * @param scriptin the autonomous script String
+	 * Constructor that takes a workingScript, constants files String, and a year identifier String.
+	 * @param scriptin the autonomous workingScript String
 	 * @param constantsin the constants file String
 	 * @param thisYear the year identifier String
 	 */
 	public Parser(String scriptin, String constantsin, String thisYear)
 	{
 		script = scriptin;
+		resetScript();
 		constantYear = thisYear;
 		constants = retrieveThisYear(constantsin);
 	}
 	
+	public void resetScript()
+	{
+		System.out.println("resetScript");
+		workingScript = script;
+	}
+	
 	/**
-	 * Returns the next line of the autonomous script.
+	 * Returns the next line of the autonomous workingScript.
 	 * @return the ArrayList of CommandBlocks that represent this line.
 	 */
 	public ArrayList<CommandBlock> nextLine()
 	{
-		if(script.equals(""))
+		if(workingScript.equals(""))
 		{
 			return new ArrayList<CommandBlock>();
 		}
-		int endOfLine = script.indexOf("\n");
+		int endOfLine = workingScript.indexOf("\n");
 		if(endOfLine == -1)
 		{
-			endOfLine = script.length();
+			endOfLine = workingScript.length();
 		}
-		String line = script.substring(0, endOfLine);//Get the next line
-		if (script.length() == endOfLine)
+		String line = workingScript.substring(0, endOfLine);//Get the next line
+		if (workingScript.length() == endOfLine)
 		{
-			script = "";//Remove the line we just retrieved
+			workingScript = "";//Remove the line we just retrieved
 		}
 		else
 		{
-			script = script.substring(endOfLine + 1);
+			workingScript = workingScript.substring(endOfLine + 1);
 		}
 		
 		//Remove comments
@@ -169,7 +176,8 @@ public class Parser
 		double[] params = new double[2];
 		params[0] = colonParam;
 		params[1] = atParam;
-		return new Command(command, params);
+		Command result = new Command(command, params);
+		return result;
 	}
 	
 	/**
@@ -249,12 +257,12 @@ public class Parser
 	}
 	
 	/**
-	 * Checks if the script has another line.
-	 * @return True if the script has another line.
+	 * Checks if the workingScript has another line.
+	 * @return True if the workingScript has another line.
 	 */
 	public boolean hasNextLine()
 	{
-		return !script.equals("");
+		return !workingScript.equals("");
 	}
 	
 	/**
@@ -266,6 +274,14 @@ public class Parser
 	}
 	
 	/**
+	 * @return the workingScript
+	 */
+	public String getWorkingScript()
+	{
+		return workingScript;
+	}
+	
+	/**
 	 * @return the constants this parser is using
 	 */
 	public String getConstants()
@@ -274,13 +290,15 @@ public class Parser
 	}
 	
 	/**
-	 * Updates the script and constants for this parser.
-	 * @param scriptin the new script
+	 * Updates the workingScript and constants for this parser.
+	 * @param scriptin the new workingScript
 	 * @param constantsin the new constants files
 	 */
 	public void update(String scriptin, String constantsin)
 	{
+		if(!script.equals(scriptin)) System.out.println("Script different");
 		script = scriptin;
+		workingScript = script;
 		String temp = retrieveThisYear(constantsin);
 		if(!temp.equals(constants)) System.out.println("Constants different");
 		constants = temp;

@@ -41,8 +41,16 @@ public class Watcher implements Subsystem
 	{
 		if(watch)
 		{
-			CANTalon turret = ((Turret)systems[1]).getTurretMotor();
-			System.out.println("turretMotor: " + turret.get());
+			if(false)
+			{
+				CANTalon turret = ((Turret)systems[1]).getTurretMotor();
+				System.out.println("turretMotor: " + turret.get());
+			}
+			if(true)
+			{
+				Shooter shooter = (Shooter)systems[2];
+				System.out.println("Shooter setpoint: " + shooter.getFlySet());
+			}
 		}
 	}
 

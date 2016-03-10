@@ -1,4 +1,3 @@
-
 package org.usfirst.frc.team3476.robot;
 
 import edu.wpi.first.wpilibj.IterativeRobot;
@@ -16,6 +15,7 @@ import edu.wpi.first.wpilibj.interfaces.Gyro;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.util.function.DoubleToLongFunction;
 
 import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.Starter;
@@ -24,7 +24,9 @@ import org.usfirst.frc.team3476.ScriptableAuto.Clock;
 import org.usfirst.frc.team3476.ScriptableAuto.Main;
 import org.usfirst.frc.team3476.Subsystems.*;
 import org.usfirst.frc.team3476.Subsystems.Drive.ShiftingState;
+import org.usfirst.frc.team3476.Subsystems.Shooter.HoodState;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
+import org.usfirst.frc.team3476.Utility.ShooterLogger;
 import org.usfirst.frc.team3476.Utility.Toggle;
 import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
@@ -33,6 +35,11 @@ import org.usfirst.frc.team3476.Utility.Control.DonutCANTalon;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDCounterPeriodWrapper;
+import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
+import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
+import org.usfirst.frc.team3476.Utility.Control.Ramper;
+
+import com.ni.vision.VisionException;
 
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.AnalogInput;
@@ -59,7 +66,7 @@ public class Robot extends IterativeRobot
 	Joystick xbox = new Joystick(0);
 	Joystick joy = new Joystick(1);
 	
-	PowerDistributionPanel pdp = new PowerDistributionPanel();
+	PowerDistributionPanel pdp = new PowerDistributionPanel(1);
 	
 	//TODO: get incorrect channels
 	Talon flyTalon1 = new Talon(8),//correct
@@ -69,6 +76,8 @@ public class Robot extends IterativeRobot
 			intake2 = new Talon(5);
 											
 	DonutCANTalon turretMotor = new DonutCANTalon(4, 0);
+	
+	PIDDashdataWrapper vision = new PIDDashdataWrapper(Data.VISIONX);
 	
 	CANTalon ddmotor = new CANTalon(3);
 	
@@ -80,7 +89,7 @@ public class Robot extends IterativeRobot
 	Solenoid shifterSoleniod = new Solenoid(0);
 	Solenoid hood = new Solenoid(1);
 	
-	enum Mode {DEFAULT, INTAKE, SHOOTUP, SHOOTDOWN}
+	enum Mode {DEFAULT, INTAKE, SHOOTCLOSE, SHOOTFAR, SHOOTFLEX}
     Mode mode = Mode.DEFAULT;
     
     //Joystick buttons
@@ -103,15 +112,16 @@ public class Robot extends IterativeRobot
     
     AnalogInput pressure = new AnalogInput(3), ballsensor = new AnalogInput(2);
     
-    AtoD loaderSwitch = new AtoD(ballsensor, 2.3);
+    AtoD loaderSwitch = new AtoD(ballsensor, 0.5, false);
     
-    DigitalInput banner = new DigitalInput(1);//comp is 1, program is 9
+    DigitalInput banner = new DigitalInput(1);
     PIDCounterPeriodWrapper tach = new PIDCounterPeriodWrapper(banner, 60);
     
     Starter starter;
     Thread starterThread;
     
     Toggle hoodToggle = new Toggle();
+    Ramper driveRamp = new Ramper(0.25, false, 0);
     
     int iters = 0;
     int threads = 0;
@@ -125,8 +135,16 @@ public class Robot extends IterativeRobot
     boolean homed = false;
     
     boolean automatic = true;
+    
+    boolean shooterdatacollect = false;
+    ShooterLogger shooterLogger;
+    
     double joysetpoint;
     int joycount;
+    int lastPOV;
+	private double testset = 0;
+	private boolean posmove;
+	private double watchset;
     
     /**
      * This function is run when the robot is first started up and should be
@@ -140,12 +158,20 @@ public class Robot extends IterativeRobot
     	drive.setInvertedMotor(RobotDrive.MotorType.kFrontRight, true);
     	drive.setInvertedMotor(RobotDrive.MotorType.kRearLeft, true);
     	drive.setInvertedMotor(RobotDrive.MotorType.kRearRight, true);
+    	
+    	leftDrive.setDistancePerPulse(0.01308996938995747182692768076366);
+    	rightDrive.setDistancePerPulse(0.01308996938995747182692768076366);
+    	
+    	intake1.setInverted(true);
+    	intake2.setInverted(true);
+    	
     	tach.setSamplesToAverage(4);
     	spiGyro.calibrate();
     	turretMotor.setSafetyEnabled(false);
     	loaderTalon.setInverted(true);
     	flyTalon2.setInverted(true);
     	new PIDCANTalonEncoderWrapper(ddmotor, 1).reset();
+    	
     	
     	if(!automatic)
     	{
@@ -154,20 +180,25 @@ public class Robot extends IterativeRobot
         	loaderTalon.setInverted(true);
     	}
     	
-    	//DONE BY SAIKIRAN TO TEST SHOOTER
-//    	
-//    	loaderTalon.setInverted(true);
+    	if(shooterdatacollect)
+    	{
+    		shooterLogger = new ShooterLogger();
+    	}
     	
         //Systems
         systems = new Subsystem[10];
 		systems[0] = new Drive(leftDrive, rightDrive, spiGyro, drive, shifterSoleniod);
-		systems[1] = new Turret(turretMotor, halleffect);
-		systems[2] = new Shooter(flyTalon1, flyTalon2, loaderTalon, (Turret)systems[1], tach, loaderSwitch);
-		systems[3] = new Intake(intake1, intake2, ddmotor);
+		systems[1] = new Turret(turretMotor, halleffect, vision);
+		systems[2] = new Shooter(	flyTalon1, flyTalon2, loaderTalon, (Turret)systems[1], tach,
+									loaderSwitch, vision, hood);
+		systems[3] = new Intake(intake1, intake2, ddmotor, pdp);
 		systems[8] = new Watcher(systems, 10);
 		systems[9] = new Clock(systems);
-		((Clock)systems[9]).megaEnd();
 		
+		((Watcher)systems[8]).watch(false);
+		
+		//misc init
+		((Clock)systems[9]).megaEnd();
 		((Drive)systems[0]).autoShifting(false);
 		
 		//Main
@@ -203,6 +234,7 @@ public class Robot extends IterativeRobot
     			((Turret)systems[1]).resetHomer();
     			homed = true;
     		}
+    		setCameramode(CameraMode.VISION);
     		main.startSubsystems();
     		main.startThread();
     		first = false;
@@ -233,7 +265,7 @@ public class Robot extends IterativeRobot
 			}
 			if(camfirst && starter.cameraDone())
 			{
-				setCameramode(CameraMode.INTAKE);
+				setCameramode(CameraMode.VISION);
 			}
 			main.updateData();
 			main.robotDriveClear();
@@ -259,12 +291,35 @@ public class Robot extends IterativeRobot
      */
     public void teleopPeriodic()
     {
+    	int POV = joy.getPOV(0);
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
-    		boolean axisprint = false, turretgo = true, buttons = false, tachprint = false,
-    				currentprint = false, pressureprint = false, driveencoderprint = false,
-    				spigyroprint = false, intakeenc = false, shooterout = false,
-    				ballsensorprint = true;
+    		//intake pos constants
+    		final double up = 295, horiz = 4630, down = 5505;
+    		
+    		final double FLYWHEELMAX = 8900;
+    		
+    		final double CLOSESPEED = 6750, FARSPEED = 7500;
+    		
+    		//prints
+    		boolean axisprint = false,  tachprint = false, currentprint = false,
+    				pressureprint = false, driveencoderprint = false, spigyroprint = false,
+    				intakeenc = false, shooterout = false, ballsensorprint = false,
+    				distanceprint = false, shootervdist = false, povprint = false,
+    				turretencoderprint = false, loaderstateprint = false;
+    		
+    		//others
+    		boolean turretgo = true, buttons = false, autodropdown = true,
+    				distmode = false, searchgo = false, manualLoad = false;
+    		
+    		boolean[] joybuttons = new boolean[13];
+    		
+    		for(int i = 1; i <= 12; i++)
+    		{
+    			joybuttons[i] = joy.getRawButton(i);
+    		}
+    		
+    		boolean joy1 = joy.getRawButton(1), joy2 = joy.getRawButton(2);
     		
     		Drive drive = (Drive)systems[0];
     		Turret turret = (Turret)systems[1];
@@ -277,7 +332,6 @@ public class Robot extends IterativeRobot
 	    		case 1://first - For the first time in forever
 	    			System.out.println("teleopPeriodic first");
 					//DO THINGS
-	    			((Watcher)systems[8]).watch(false);
 	    			shooter.end();
 	    			turret.end();
 					main.startSubsystems();//we need subsystems but not main
@@ -292,7 +346,16 @@ public class Robot extends IterativeRobot
 			    			turret.resetHomer();
 			    			homed = true;
 			    		}
-						intake.moveDropdown(20);
+						if(shooterdatacollect)
+						{
+							shooterLogger.clearLogger();
+						}
+						if(searchgo)
+						{
+							turret.aim(0);
+						}
+						
+						driveRamp.reset();
 					}
 					else
 					{
@@ -303,13 +366,111 @@ public class Robot extends IterativeRobot
 	    		default://!first - Normal execution
 	    			if(automatic)
 	    			{
-	    				main.robotDriveClear();
+	    				double 	xAxis = -xbox.getRawAxis(4),
+	    		    			yAxis = -xbox.getRawAxis(1);
+	    				drive.manualDrive(driveRamp.doubleAction(yAxis), xAxis);
+	    				
+	    				if(joybuttons[8])
+	    				{
+	    					setCameramode(CameraMode.VISION);
+	    					mode = Mode.SHOOTCLOSE;
+	    				}
+	    				else if(joybuttons[10])
+	    				{
+	    					setCameramode(CameraMode.VISION);
+	    					mode = Mode.SHOOTFAR;
+	    				}
+	    				else if(joybuttons[12])
+	    				{
+	    					setCameramode(CameraMode.INTAKE);
+	    					mode = Mode.DEFAULT;
+	    				}
+	    				else if(joybuttons[6])
+	    				{
+	    					setCameramode(CameraMode.VISION);
+	    					mode = Mode.SHOOTFLEX;
+	    				}
+	    				
+	    				if(xbox.getRawButton(2))
+	    				{
+	    					setCameramode(CameraMode.INTAKE);
+	    				}
+	    				
+	    				boolean eject = joybuttons[4];
+	    				
+	    				if(eject)
+	    				{
+	    					shooter.resetLoader();
+	    					shooter.manualLoader(-1);
+	    				}
+	    				
+	    				if(eject)
+	    				{
+	    					intake.manualIntake(-1);
+	    				}
+	    				else if(joybuttons[3])
+	    				{
+	    					intake.manualIntake(1);
+	    				}
+	    				else if(joybuttons[5])
+	    				{
+	    					intake.manualIntake(-1);
+	    				}
+	    				else
+						{
+	    					intake.manualIntake(0);
+						}
+	    				
+	    				if(eject)
+	    				{
+	    					shooter.manualShooter(-1);
+	    				}
+	    				else
+	    				{
+		    				switch(mode)
+		    				{
+			    				case SHOOTCLOSE:
+			    					shooter.setHood(HoodState.HIGH);
+			    					shooter.setFly(CLOSESPEED);
+		    						break;
+		    						
+			    				case SHOOTFAR:
+			    					shooter.setHood(HoodState.LOW);
+			    					shooter.setFly(FARSPEED);
+		    						break;
+		    						
+			    				case SHOOTFLEX:
+			    					shooter.setHood(HoodState.LOW);
+		    						if(distmode)
+		    		    			{
+		    		    				if(joy.getRawButton(2))
+		    		    				{
+		    		    					shooter.setFly();
+		    		    				}
+		    		    				else
+		    		    				{
+		    		    					shooter.stopFly();
+		    		    				}
+		    		    			}
+		    		    			else//nondist
+		    		    			{
+		    		    				System.out.println("Flyset: " + ((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
+		    		    				shooter.setFly(((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
+		    		    			}
+		    						break;
+		    						
+			    				case DEFAULT:
+			    					shooter.setHood(HoodState.LOW);
+			    					shooter.setFly(0);
+			    					break;
+			    				default:
+			    					System.out.println("Invalid Teleop State: " + mode);
+			    					break;
+		    				}
+	    				}
+	    				
 	    				if(turretgo)
 	    				{
-	    					double 	xAxis = -xbox.getRawAxis(4),
-		    		    			yAxis = -xbox.getRawAxis(1);
-		    				drive.manualDrive(yAxis, xAxis);
-		    				
 	    					if(buttons)
 	    					{
 				    			if(joy.getRawButton(1))
@@ -333,30 +494,69 @@ public class Robot extends IterativeRobot
 				    				turret.aim(-0.65);
 				    			}
 	    					}
-	    					else//joystick setpoint
+	    					else if(searchgo)//search testing
 	    					{
-	    						if(joy.getRawButton(2))
+	    						if(joy2 && !lastJoy2)
+    							{
+	    							turret.search(-0.1);
+    							}
+	    						else if(!turret.isSearching())
 	    						{
-	    							if(!lastJoy2)
-	    							{
-	    								turret.printPID();
-	    							}
 	    							turret.aim();
 	    						}
-	    						else
+	    					}
+	    					else//joystick setpoint
+	    					{
+	    						//if(intake.intakeRunning()) POV = 0;//turn the turret if the intake is running
+	    						switch(POV)
+    							{
+	    							case -1://nothing
+	    								watchset = Double.NaN;
+	    								posmove = false;
+	    								break;
+	    								
+	    							default:
+	    								watchset = POV/360.0 + 0.000000001;
+	    								posmove = true;
+    							}
+	    						
+	    						if(posmove)//moving to position
 	    						{
-	    							if(lastJoy2)
+	    							if(turret.isAutoDone() && turret.getTurretSet() == watchset)//posmove done
 	    							{
-	    								joysetpoint = turret.getTurretEncoder().getDistance();
+	    								posmove = false;
 	    							}
-	    							if(Math.abs(joy.getRawAxis(0)) > 0.1)
-		    							joysetpoint += joy.getRawAxis(0)*0.01;
-	    							else
+	    							else//not there yet, set it yo
 	    							{
-	    								joysetpoint = turret.getTurretEncoder().getDistance();
+	    								turret.aim(watchset);
 	    							}
-		    						
-	    							turret.aim(joysetpoint);
+	    						}
+	    						else//joystick setpoint
+	    						{
+		    						if(joy.getRawButton(2))
+		    						{
+		    							if(!lastJoy2)
+		    							{
+		    								turret.printPID();
+		    							}
+		    							turret.aim();
+		    						}
+		    						else
+		    						{
+		    							if(lastJoy2)
+		    							{
+		    								joysetpoint = turret.getTurretEncoder().getDistance();
+		    							}
+		    							if(Math.abs(joy.getRawAxis(0)) > 0.1)
+			    							joysetpoint += joy.getRawAxis(0)*0.01;
+		    							else
+		    							{
+		    								joysetpoint = turret.getTurretEncoder().getDistance();
+		    								System.out.println("joysetpoint: " + joysetpoint);
+		    							}
+			    						
+		    							turret.aim(joysetpoint);
+		    						}
 	    						}
 	    					}
 	    				}
@@ -364,57 +564,67 @@ public class Robot extends IterativeRobot
 	    				{
 	    					turret.manualTurret(joy.getAxis(AxisType.kX));//xaxis
 	    				}
-	    				
-		    			double FLYWHEELMAX = 8900;
 		    			
 		    			//shooter.manualShooter((-joy.getRawAxis(3)+1)/2);//throttle
 		    			//shooter.manualShooter(0);
-		    			shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
+		    			//shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
 		    			
-	    				shooter.setFly(((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
+	    				if(autodropdown)
+	    				{
+		    				if(joy.getRawButton(7))
+		    				{
+		    					intake.moveDropdown(up);
+		    				}
+		    				else if(joy.getRawButton(9))
+		    				{
+		    					intake.moveDropdown(horiz);
+		    				}
+		    				else if(joy.getRawButton(11))
+		    				{
+		    					intake.moveDropdown(down);
+		    				}
+	    				}
+	    				else//manual dropdown
+	    				{
+	    					intake.manualDropdown(-joy.getRawAxis(1));//yaxis
+	    				}
 		    			
-		    			double up = 20, horiz = 4310, down = 5230;
+		    			if(shooterdatacollect)
+		    			{
+		    				if(joy1 && !lastJoy)
+		    				{
+		    					shooterLogger.prepValue(turret.getVisionWrapper().getClosestDist(), 60/tach.getPeriod());
+		    				}
+		    				
+		    				if(shooterdatacollect && shooterLogger.valueToLog() && joy.getPOV(0) == 0)
+		    				{
+		    					shooterLogger.logPrepped();
+		    				}
+		    				
+		    				if(shooterdatacollect && POV == 180 && lastPOV != 180)
+		    				{
+		    					System.out.println(shooterLogger);
+		    				}
+		    			}
+		    			else if(manualLoad)
+		    			{
+		    				if(joy1 && !lastJoy)
+		    				{
+		    					System.out.println("DOING THE LOAD HACK\n\n\n\n\n\n");
+		    					shooter.setLoaded();
+		    					shooter.startFire();
+		    				}
+		    			}
+		    			else
+		    			{
+		    				shooter.intakeNotify(intake.intakeRunning());
+			    			if(joy.getRawButton(1)) shooter.startFire();
+		    			}
 		    			
-	    				if(joy.getRawButton(7))
-	    				{
-	    					intake.moveDropdown(up);
-	    				}
-	    				else if(joy.getRawButton(9))
-	    				{
-	    					intake.moveDropdown(horiz);
-	    				}
-	    				else if(joy.getRawButton(11))
-	    				{
-	    					intake.moveDropdown(down);
-	    				}
-		    			
-	    				
-	    				
-		    			if(joy.getRawButton(3))
-	    				{
-	    					intake.manualIntake(1);
-	    				}
-	    				else if(joy.getRawButton(4))
-	    				{
-	    					intake.manualIntake(-1);
-	    				}
-	    				else if(joy.getRawButton(5))
-	    				{
-	    					intake.manualIntake(0.5);
-	    				}
-	    				else if(joy.getRawButton(6))
-	    				{
-	    					intake.manualIntake(-0.5);
-	    				}
-	    				else
-						{
-	    					intake.manualIntake(0);
-						}
-		    			
-		    			shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
+		    			drive.setShifterState(xbox.getRawAxis(3) > 0.5 ? ShiftingState.HIGH : ShiftingState.LOW);
 		    			
 		    			hoodToggle.input(joy.getRawButton(12));
-	    				hood.set(hoodToggle.get());
+//	    				hood.set(hoodToggle.get());
     				}
 	    			else//manual
 	    			{
@@ -442,7 +652,26 @@ public class Robot extends IterativeRobot
 	    					drive.manualDrive(yAxis, xAxis);
 	    				}
 	    				
-	    				turret.manualTurret(joy.getAxis(AxisType.kX));//xaxis
+	    				boolean donuttest = true;
+	    				
+	    				if(donuttest)
+	    				{
+	    					if(joy.getRawButton(1) && !lastJoy)
+	    					{
+	    						testset += 0.005;
+	    					}
+	    					else if(joy.getRawButton(2) && !lastJoy2)
+	    					{
+	    						testset -= 0.005;
+	    					}
+	    					turret.manualTurret(testset);//xaxis
+	    					System.out.println("Motor value: " + turretMotor.get());
+	    				}
+	    				else
+	    				{
+	    					turret.manualTurret(joy.getRawAxis(0));//xaxis
+	    				}
+	    				
 	    				shooter.manualShooter((-joy.getRawAxis(3)+1)/2);//throttle
 	    				shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
 	    				
@@ -471,14 +700,39 @@ public class Robot extends IterativeRobot
 	    				hoodToggle.input(joy.getRawButton(12));
 	    				hood.set(hoodToggle.get());
 	    				
-	    				//drive.setShifterState(xbox.getRawAxis(3) > 0.5 ? ShiftingState.HIGH : ShiftingState.LOW);
+	    				drive.setShifterState(xbox.getRawAxis(3) > 0.5 ? ShiftingState.HIGH : ShiftingState.LOW);
 	    				
 	    				//System.out.println("Banner: " + banner.get());
 	    			}
 	    			
+	    			if(loaderstateprint)
+	    			{
+	    				System.out.println("Loader State: " + shooter.getLoaderState());
+	    			}
+	    			
+	    			if(turretencoderprint)
+	    			{
+	    				System.out.println("Turret encoder: " + turret.getTurretEncoder().getDistance());
+	    			}
+	    			
+	    			if(povprint)
+	    			{
+	    				System.out.println("POV: " + joy.getPOV(0));
+	    			}
+	    			
+	    			if(shootervdist)
+	    			{
+	    				System.out.println("{Tach, Dist}: {" + (60/tach.getPeriod()) + ", " + turret.getVisionWrapper().getClosestDist() + "}");
+	    			}
+	    			
+	    			if(distanceprint)
+	    			{
+	    				System.out.println("Distance to goal: " + turret.getVisionWrapper().getClosestDist());
+	    			}
+	    			
 	    			if(ballsensorprint)
 	    			{
-	    				System.out.println("Voltage: " + ballsensor.getVoltage() + ", AtoD Value: " + loaderSwitch.above());
+	    				System.out.println("Voltage: " + ballsensor.getVoltage() + ", AtoD Value: " + loaderSwitch.get());
 	    			}
 	    			
 	    			if(currentprint)
@@ -493,6 +747,7 @@ public class Robot extends IterativeRobot
 	    			
 	    			if(intakeenc)
 	    			{
+	    				System.out.println("Setpoint: " + intake.getDDSet());
 	    				System.out.println("Encoder: " + intake.getIntakeEncoder().getDistance());
 	    			}
 	    			
@@ -516,7 +771,7 @@ public class Robot extends IterativeRobot
     				
     				if(tachprint)
     				{
-		        		System.out.println("Tach: " + (60/tach.getPeriod()));
+		        		if(iters % 10 == 0) System.out.println("Tach: " + (60/tach.getPeriod()));
     				}
     				
     				if(pressureprint)
@@ -538,11 +793,10 @@ public class Robot extends IterativeRobot
 	    			System.out.println("DIO: " + banner.get());
 	    			System.out.println("Hall: " + halleffect.get());*/
 	    			
-	    			setCameramode(CameraMode.VISION);
-	    			
 	    			//System.out.println("SPI Gyro: " + spiGyro.get());
     		}
 		}
+    	lastPOV = POV;
     	lastJoy = joy.getRawButton(1);
     	lastJoy2 = joy.getRawButton(2);
     	iters++;

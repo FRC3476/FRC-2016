@@ -422,10 +422,10 @@ public class Drive implements Subsystem
 		switch(state)
 		{
 			case HIGH:
-				shifters.set(false);
+				shifters.set(true);
 				break;
 			case LOW:
-				shifters.set(true);
+				shifters.set(false);
 				break;
 		}
 	}

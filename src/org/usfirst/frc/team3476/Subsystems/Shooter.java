@@ -4,10 +4,12 @@ package org.usfirst.frc.team3476.Subsystems;
 import java.util.Arrays;
 
 import org.usfirst.frc.team3476.Main.Subsystem;
+import org.usfirst.frc.team3476.Subsystems.Turret.VisionMode;
 import org.usfirst.frc.team3476.Utility.DIOHomer;
 import org.usfirst.frc.team3476.Utility.DIOHomer.HomeState;
 import org.usfirst.frc.team3476.Utility.ManualHandler;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
+import org.usfirst.frc.team3476.Utility.PolynomialFunction;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
@@ -17,6 +19,7 @@ import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
 import org.usfirst.frc.team3476.Utility.Control.SmoothBangBang;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
 import org.usfirst.frc.team3476.Utility.Control.PIDMotorGroup;
+import org.usfirst.frc.team3476.Utility.Control.PIDPolynomialWrapper;
 import org.usfirst.frc.team3476.Utility.Control.TakeBackHalf;
 
 import edu.wpi.first.wpilibj.CANSpeedController;
@@ -26,6 +29,7 @@ import edu.wpi.first.wpilibj.DigitalInput;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDController.Tolerance;
+import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.hal.DIOJNI;
@@ -36,24 +40,22 @@ import edu.wpi.first.wpilibj.hal.DIOJNI;
  */
 public class Shooter implements Subsystem
 {
-	private final String[] autoCommands = {"shooter", "visionaim", "encoderaim", "flywheel", "fire", "reload"};
+	private final String[] autoCommands = {"shooter", "flywheel", "fire", "reload", "directfire"};
 	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN",
-			"FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "TURRETENCODERP", "TURRETENCODERI", "TURRETENCODERD",
-			"TURRETENCODERDEAD", "LOADERSPEED", "SOFTLIMITS", "USESOFT", "HOMINGDIR", "HOMEHIGH",
-			"HOMESEEKSPEED", "HOMESLOWSPEED", "HOMETIMEOUT", "NUMSMOOTHSAMPLES", "SHOOTERPGAIN", "SHOOTERDGAIN", "LOADERSPEEDLOW",
-			"FIRINGTIME"};
-	private final double RPSPERRPM = 60, TURRETOUTPUTRANGE = 0.25, ROTATIONSPERTICK = 2.2379557291666666666666666666667e-5;
+			"FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "LOADERSPEED",
+			"SHOOTERPGAIN", "SHOOTERDGAIN", "LOADERSPEEDLOW", "FIRINGTIME"};
+	private final double RPSPERRPM = 60, TURRETOUTPUTRANGE = 0.25;
 	
-	enum AimMode{VISION, ENCODER}
-	AimMode aimmode;
 	enum LoaderState{RELOADINGSLOW, RELOADINGFAST, LOADED, FIRING, WAITING}
 	LoaderState loaderState;
+	enum FlyState{SETPOINT, DISTANCE}
+	FlyState flyState;
+	public enum HoodState{HIGH, LOW}
 	
 	private double SHOOTEROUTPUTRANGEHIGH, SHOOTEROUTPUTRANGELOW, SHOOTERIGAIN, FLYWHEELDEAD,
-	FLYWHEELMAXSPEED, TURRETENCODERP, TURRETENCODERI, TURRETENCODERD,
-	TURRETENCODERDEAD, LOADERSPEED, SOFTLIMITS, SOFTRESETANGLE, USESOFT, HOMINGDIR, HOMEHIGH,
-	HOMESEEKSPEED, HOMESLOWSPEED, HOMETIMEOUT, NUMSMOOTHSAMPLES,
-	SHOOTERPGAIN, SHOOTERDGAIN, LOADERSPEEDLOW, FIRINGTIME;
+	FLYWHEELMAXSPEED, LOADERSPEED, SHOOTERPGAIN, SHOOTERDGAIN, LOADERSPEEDLOW,
+	FIRINGTIME;
+	
 	private int softDir;
 	private int[] FLYDIRS;
 	private boolean flyDone, loadDone, toFire, toReload, firingLast,
@@ -71,25 +73,37 @@ public class Shooter implements Subsystem
 	private SubsystemTask task;
 	private Thread shooterThread;
 	
+	private PolynomialFunction distToFly;
+	private PIDDashdataWrapper vision;
+	
 	private RunningAverage tachavg;
+	
+	private String lastCommand;
 	
 	private int iters;
 	
 	final long MANUALTIMEOUT = 50;//in ms
 	final double FLYPIDEXECTIME = 1;
-	private ManualHandler shooterManual, loaderManual, turretManual;
+	private ManualHandler shooterManual, loaderManual;
 	
-	private DIOHomer turretHomer;
+	private Solenoid hood;
 	
 	Turret turret;
 	private boolean lastballsw;
 	private double flyset, lastflyset;
-	
+	private boolean lastintakeRunning;
+	private LoaderState prevstate;
+	private boolean fireDone;
+	private double lastsetvision;
 	
 	public Shooter(	SpeedController fly1in, SpeedController fly2in, SpeedController loaderin,
-					Turret turretin, PIDCounterPeriodWrapper tachin, AtoD loaderSwitchin)
+					Turret turretin, PIDCounterPeriodWrapper tachin, AtoD loaderSwitchin,
+					PIDDashdataWrapper vision, Solenoid hood)
 	{
 		turret = turretin;
+		
+		distToFly = new PolynomialFunction(22870.2, -4285.51, 243.7);//2nd order, 0, 1, 2
+		this.vision = vision;
 		
 		//Shooter
 		fly1 = fly1in;
@@ -108,19 +122,26 @@ public class Shooter implements Subsystem
 		//control = new TakeBackHalf(new double[]{0, 0}, 0, 0);
 		//control = new TakeBackHalf(new double[]{0, 0}, 1);
 		flywheelcontrol = new PIDController(0, 0, 0, tach, flygroup, FLYPIDEXECTIME/1000.0);
+		flyState = FlyState.SETPOINT;
+		lastCommand = "";
 		
 		//Loader
 		loaderSwitch = loaderSwitchin;
 		loader = loaderin;
 		loaderState = LoaderState.WAITING;
+		prevstate = LoaderState.RELOADINGFAST;
+		loadDone = true;
+		fireDone = true;
+		
+		//Hood
+		this.hood = hood;
 		
 		//Manuals
 		shooterManual = new ManualHandler(MANUALTIMEOUT);
-		turretManual = new ManualHandler(MANUALTIMEOUT);
 		loaderManual = new ManualHandler(MANUALTIMEOUT);
 		
 		iters = 0;
-		task = new SubsystemTask(this, 10);//10ms minimum exec time
+		task = new SubsystemTask(this, 5);//x ms minimum exec time
 		shooterThread = new Thread(task, "shooterThread");
 		shooterThread.start();
 	}
@@ -134,6 +155,7 @@ public class Shooter implements Subsystem
 	@Override
 	public synchronized void doAuto(double[] params, String command)
 	{
+		lastCommand = command;
 		switch(command)
 		{
 			case "shooter":
@@ -146,13 +168,11 @@ public class Shooter implements Subsystem
 				startFire();
 				break;
 			case "reload":
+				reload();
+				break;
+			case "directfire":
+				setLoaded();
 				startFire();
-				break;
-			case "visionaim":
-				turret.doAuto(params, command);
-				break;
-			case "encoderaim":
-				turret.doAuto(params, command);
 				break;
 		}
 	}
@@ -160,7 +180,22 @@ public class Shooter implements Subsystem
 	@Override
 	public synchronized boolean isAutoDone()
 	{
-		return flyDone && loadDone;
+		/*switch(lastCommand)
+		{
+			case "shooter":
+				return flyDone;
+			case "flywheel":
+				return flyDone;
+			case "fire":
+				return fireDone;
+			case "reload":
+				return loadDone;
+			case "directfire":
+				return fireDone;
+			default:
+				return true;
+		}*/
+		return fireDone && flyDone && loadDone;
 	}
 	
 	@Override
@@ -196,36 +231,15 @@ public class Shooter implements Subsystem
 		i++;//6
 		FLYWHEELMAXSPEED = constantsin[i];
 		i++;//7
-		TURRETENCODERP = constantsin[i];
-		i++;//8
-		TURRETENCODERI = constantsin[i];
-		i++;//9
-		TURRETENCODERD = constantsin[i];
-		i++;//10
-		TURRETENCODERDEAD = constantsin[i];
-		i++;//11
 		LOADERSPEED = constantsin[i];
-		i++;//12
-		SOFTLIMITS = constantsin[i];
-		SOFTRESETANGLE = Math.min(1.5*SOFTLIMITS, 0.95);
-		i++;//13
-		USESOFT = constantsin[i];
-		i++;//14
-		HOMINGDIR = constantsin[i];
-		i++;//15
-		HOMEHIGH = constantsin[i];
-		i++;//16
-		HOMESEEKSPEED = constantsin[i];
-		i++;//17
-		HOMESLOWSPEED = constantsin[i];
-		i++;//18
-		HOMETIMEOUT = constantsin[i];
-		i++;//19
-		NUMSMOOTHSAMPLES = constantsin[i];
-		i++;//20
+		i++;//8
 		SHOOTERPGAIN = constantsin[i];
-		i++;//21
+		i++;//9
 		SHOOTERDGAIN = constantsin[i];
+		i++;//10
+		LOADERSPEEDLOW = constantsin[i];
+		i++;//11
+		FIRINGTIME = constantsin[i];
 		
 		if(!Arrays.equals(FLYDIRS, prevflydirs))
 		{
@@ -274,28 +288,39 @@ public class Shooter implements Subsystem
 				flywheelcontrol.enable();
 			}
 			
-			if(flyset != lastflyset)//new value
+			switch(flyState)
 			{
-				flywheelcontrol.setSetpoint(flyset);
+				case DISTANCE:
+					if(vision.targetAvailable())
+					{
+						double visionval = distToFly.calc(vision.getClosestDist());
+						
+						if(vision.checkFrameDouble())//new frame? checkFrame resets the flag
+						{
+							//recalc angle, new vision value (vision error may or may not be in tolerance)
+							//System.out.println("Vision: " + visionval + " DEAD: " + TURRETENCODERDEAD);
+							if(visionval != lastsetvision)//if this value has not been previously set, set it
+							{
+								lastsetvision = visionval;
+								flyset = visionval;
+							}
+						}
+					}
+					else
+					{
+						flywheelcontrol.disable();
+						break;
+					}
+					
+					
+				case SETPOINT:
+					if(flyset != lastflyset)//new value
+					{
+						flywheelcontrol.setSetpoint(flyset);
+					}
+					//if(iters % 15 == 0) System.out.println(OrangeUtility.PIDData(flywheelcontrol));
+					break;
 			}
-			
-			/*if(control == null)
-			{
-				throw new NullPointerException("No TakeBackHalf controller in Subsystem \"" + this +  "\" - constants not returned");
-			}
-			else
-			{
-				output = control.output(process);
-			}
-			//OrangeUtility.ControlData(control.getError(process), process, output)
-			/*if(iters % 20 == 0)
-			{
-				String print = OrangeUtility.ControlLoopData(control, process) + "\nI: " + control.getGain() + "\nSetpoint: " + control.getMax();
-				System.out.println(print);
-			}*/
-			//output = control.getSetpoint() > 0 ? output : 0;
-			//fly1.set(output*FLYDIRS[0]);
-			//fly2.set(output*FLYDIRS[1]);
 			
 			if(flywheelcontrol.onTarget() && Math.abs(flywheelcontrol.getError()) < FLYWHEELDEAD)
 			{
@@ -315,18 +340,26 @@ public class Shooter implements Subsystem
 		//======================
 		//========Loader========
 		//======================
-		boolean ballsw = loaderSwitch.above();
+		boolean cancelLoad = !intakeRunning && lastintakeRunning;
+		boolean ballsw = loaderSwitch.get();
 		if(loaderManual.isTimeUp())
 		{
 			switch(loaderState)
 			{
 				case WAITING:
 					loader.set(0);
-					if(intakeRunning || toReload)
+					if(toReload)
 					{
 						loaderState = LoaderState.RELOADINGFAST;
 					}
-					loadDone = true;
+					else if(intakeRunning)
+					{
+						loaderState = prevstate;
+					}
+					else
+					{
+						loadDone = true;
+					}
 					
 					//Reset state to avoid unpredictable behavior
 					toFire = false;
@@ -334,7 +367,13 @@ public class Shooter implements Subsystem
 					
 				case RELOADINGFAST:
 					loader.set(LOADERSPEED);
-					if(ballsw && !lastballsw)
+					if(cancelLoad)
+					{
+						cancelLoad = false;
+						prevstate = LoaderState.RELOADINGFAST;//remember state
+						loaderState = LoaderState.WAITING;
+					}
+					else if(ballsw)
 					{
 						loaderState = LoaderState.RELOADINGSLOW;
 					}
@@ -346,9 +385,17 @@ public class Shooter implements Subsystem
 					
 				case RELOADINGSLOW:
 					loader.set(LOADERSPEEDLOW);
-					if(!ballsw && lastballsw)
+					if(cancelLoad)
 					{
+						cancelLoad = false;
+						prevstate = LoaderState.RELOADINGSLOW;//remember state
+						loaderState = LoaderState.WAITING;
+					}
+					else if(!ballsw)
+					{
+						prevstate = LoaderState.RELOADINGFAST;//reset state
 						loaderState = LoaderState.LOADED;
+						loadDone = true;
 					}
 					
 					//Reset state to avoid unpredictable behavior
@@ -358,13 +405,15 @@ public class Shooter implements Subsystem
 					
 				case LOADED:
 					loader.set(0);
+					loadDone = true;
+					
 					if(toFire)
 					{
+						prevstate = LoaderState.RELOADINGFAST;//reset state
 						loaderState = LoaderState.FIRING;
 						shootingTimer.reset();
 						shootingTimer.start();
 					}
-					loadDone = true;
 					
 					//Reset state to avoid unpredictable behavior
 					toReload = false;
@@ -374,7 +423,9 @@ public class Shooter implements Subsystem
 					loader.set(LOADERSPEED);
 					if(shootingTimer.get() > FIRINGTIME)//done firing
 					{
+						prevstate = LoaderState.RELOADINGFAST;//reset state
 						loaderState = LoaderState.WAITING;
+						fireDone = true;
 					}
 					//Reset state to avoid unpredictable behavior
 					toReload = false;
@@ -388,6 +439,29 @@ public class Shooter implements Subsystem
 		
 		iters++;
 		lastballsw = ballsw;
+		lastintakeRunning = intakeRunning;
+	}
+	
+	public double getFlySet()
+	{
+		return flywheelcontrol.getSetpoint();
+	}
+	
+	public synchronized void stopFly()
+	{
+		setFly(0);
+	}
+	
+	public LoaderState getLoaderState()
+	{
+		return loaderState;
+	}
+	
+	public synchronized void setLoaded()
+	{
+		prevstate = LoaderState.RELOADINGFAST;//reset state
+		loaderState = LoaderState.LOADED;
+		loadDone = true;
 	}
 	
 	/**
@@ -415,9 +489,9 @@ public class Shooter implements Subsystem
 	 * Notifies the Shooter of the intake's activities.
 	 * @param runnning if the shooter is running
 	 */
-	public void intakeNotify(boolean runnning)
+	public synchronized void intakeNotify(boolean running)
 	{
-		intakeRunning = runnning;
+		intakeRunning = running;
 	}
 	
 	/**
@@ -435,7 +509,7 @@ public class Shooter implements Subsystem
 	public synchronized void startFire()
 	{
 		toFire = true;
-		loadDone = false;
+		fireDone = false;
 	}
 	
 	/**
@@ -443,7 +517,9 @@ public class Shooter implements Subsystem
 	 */
 	public synchronized void resetLoader()
 	{
+		prevstate = LoaderState.RELOADINGFAST;//reset state
 		loaderState = LoaderState.WAITING;
+		fireDone = true;
 	}
 	
 	public synchronized boolean isFiring()
@@ -459,6 +535,18 @@ public class Shooter implements Subsystem
 	{
 		flyDone = false;
 		flyset = rpm;
+		flyState = FlyState.SETPOINT;
+	}
+	
+	public synchronized void setFly()
+	{
+		flyDone = false;
+		flyState = FlyState.DISTANCE;
+	}
+	
+	public void setHood(HoodState state)
+	{
+		hood.set(state != HoodState.LOW);//low by default
 	}
 	
 	public String toString()

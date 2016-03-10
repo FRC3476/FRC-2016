@@ -2,6 +2,7 @@ package org.usfirst.frc.team3476.ScriptableAuto;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.*;
@@ -29,7 +30,7 @@ public class Main
 	 * Testing constructor. Not for robot use.
 	 * @param year the constants identifier
 	 * @param systemsin the array of robot systems on this robot
-	 * @param script the test script String to use
+	 * @param workingScript the test workingScript String to use
 	 * @param constants the constants String to use
 	 */
 	public Main(String year, Subsystem[] systemsin, String script, String constants)
@@ -64,7 +65,9 @@ public class Main
 	{
 		stop = false;
 		if(autoThread.getState() != Thread.State.NEW)
+		{
 			autoThread = new Thread(auto, "autoThread");
+		}
 		autoThread.start();//This thread calls start in Main
 	}
 	
@@ -73,7 +76,10 @@ public class Main
 	 */
 	private void start()
 	{
+		System.out.println("start() called");
 		reset();
+		par.resetScript();
+		System.out.println("Script: " + par.getWorkingScript());
 		ArrayList<CommandBlock> curCommands;
 		Subsystem current;
 		boolean done;
@@ -115,8 +121,8 @@ public class Main
 	}
 	
 	/**
-	 * Returns the driver selected autonomous script.
-	 * @return the String representation of the script
+	 * Returns the driver selected autonomous workingScript.
+	 * @return the String representation of the workingScript
 	 */
 	private String getScript()
 	{
@@ -187,7 +193,7 @@ public class Main
 	{
 		for(Subsystem toSearch : systems)
 		{
-			if(toSearch != null)
+			if(toSearch != null && toSearch.getAutoCommands() != null)
 			{
 				for(String searchString : toSearch.getAutoCommands())
 				{
@@ -204,11 +210,11 @@ public class Main
 	}
 	
 	/**
-	 * Sends the echo of the script back to the Dashboard so that communications can be verified.
+	 * Sends the echo of the workingScript back to the Dashboard so that communications can be verified.
 	 */
 	public void sendCheckText()
 	{
-		Dashcomm.putString("/auto/java check text", par.getScript());
+		Dashcomm.putString("auto/java check text", par.getScript());
 	}
 	
 	/**
@@ -284,7 +290,7 @@ public class Main
 	}
 	
 	/**
-	 * Updates the script and constants for the Parser so that it can parse the latest selected autonomous and get the latest constants.
+	 * Updates the workingScript and constants for the Parser so that it can parse the latest selected autonomous and get the latest constants.
 	 */
 	public void updateData()
 	{

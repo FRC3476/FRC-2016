@@ -9,7 +9,7 @@ public interface Subsystem
 	String[] getAutoCommands();
 	
 	/**
-	 * A method to be called by Main to invoke a command from the script.
+	 * A method to be called by Main to invoke a command from the workingScript.
 	 * MUST BE SYNCHRONIZED IN IMPLEMENTATION.
 	 * @param params the parameters to the command to be used with the command
 	 * @param command the command to be invoked
