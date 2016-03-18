@@ -424,10 +424,7 @@ public class Turret implements Subsystem
 						case ENCODER:
 							//If first exec, make sure we're using the right control
 							//System.out.println("Lastturretdone: " + lastturretdone);
-							if(!turretencodercontrol.isEnabled())
-							{
-								turretencodercontrol.enable();
-							}
+							conditionalEnable();
 							//System.out.println("Enable: " + turretencodercontrol.isEnabled() + ", Mode: " + aimmode);
 							
 							String print = "";
@@ -484,7 +481,6 @@ public class Turret implements Subsystem
 							if((turretencodercontrol.onTarget() && Math.abs(turretencodercontrol.getError()) < TURRETENCODERDEAD) ||
 									searchdone || visiondone)
 							{
-								System.out.println("TURRETIF");
 								//System.out.println("onTarget: " + turretencodercontrol.getError());
 //								System.out.println("onTarget error: " + turretencodercontrol.getAvgError() +
 //										", error: " + turretencodercontrol.getError());
@@ -508,18 +504,12 @@ public class Turret implements Subsystem
 				}
 				else
 				{
-					if(turretencodercontrol.isEnabled())
-					{
-						turretencodercontrol.disable();
-					}
+					conditionalDisable();
 				}
 			}
 			else
 			{
-				if(turretencodercontrol.isEnabled())
-				{
-					turretencodercontrol.disable();
-				}
+				conditionalDisable();
 			}
 			
 			if(USESOFT != 0)//use soft limits
@@ -542,6 +532,8 @@ public class Turret implements Subsystem
 		}
 		else//homing
 		{
+			conditionalDisable();
+			
 			if(turretHomer != null)
 			{
 				turretHomer.update();
@@ -573,6 +565,22 @@ public class Turret implements Subsystem
 		{
 			timereport += "endchk: " + endTime;
 			System.out.println(timereport);
+		}
+	}
+	
+	private void conditionalDisable()
+	{
+		if(turretencodercontrol.isEnabled())
+		{
+			turretencodercontrol.disable();
+		}
+	}
+	
+	private void conditionalEnable()
+	{
+		if(!turretencodercontrol.isEnabled())
+		{
+			turretencodercontrol.enable();
 		}
 	}
 	

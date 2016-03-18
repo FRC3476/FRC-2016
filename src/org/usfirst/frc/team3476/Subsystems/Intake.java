@@ -64,7 +64,7 @@ public class Intake implements Subsystem
 		ddController.setOutputRange(0, 0);
 		ddController.setToleranceBuffer(6);
 		stopdd = false;
-		homed  = false;
+		homed = false;
 		
 		//Manuals
 		ddManual = new ManualHandler(MANUALTIMEOUT);
@@ -289,6 +289,11 @@ public class Intake implements Subsystem
 				break;
 		}
 	}*/
+	
+	public void stopHoming()
+	{
+		homed = true;
+	}
 	
 	public double getDDSet()
 	{

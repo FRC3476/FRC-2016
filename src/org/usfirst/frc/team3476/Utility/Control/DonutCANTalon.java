@@ -1,12 +1,11 @@
 package org.usfirst.frc.team3476.Utility.Control;
 
-import java.util.Arrays;
-
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
+import edu.wpi.first.wpilibj.CANSpeedController;
 import edu.wpi.first.wpilibj.CANTalon;
 
-public class DonutCANTalon extends CANTalon
+public class DonutCANTalon extends CANTalon implements CANSpeedController
 {
 	private double donutThreshold;
 	private double clamp;

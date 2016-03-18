@@ -141,7 +141,7 @@ public class Shooter implements Subsystem
 		loaderManual = new ManualHandler(MANUALTIMEOUT);
 		
 		iters = 0;
-		task = new SubsystemTask(this, 5);//x ms minimum exec time
+		task = new SubsystemTask(this, 2);//x ms minimum exec time
 		shooterThread = new Thread(task, "shooterThread");
 		shooterThread.start();
 	}
@@ -440,6 +440,11 @@ public class Shooter implements Subsystem
 		iters++;
 		lastballsw = ballsw;
 		lastintakeRunning = intakeRunning;
+	}
+	
+	public synchronized double getIntakeScaling()
+	{
+		return loaderState == LoaderState.RELOADINGSLOW ? Math.abs(LOADERSPEEDLOW) : Math.abs(LOADERSPEED);
 	}
 	
 	public double getFlySet()

@@ -103,6 +103,37 @@ public class OrangeUtility
 		return toDonut - threshold;
 	}
 	
+	public static double scalingDonut(double toDonut, double threshold, double clamp, double maxInput)
+	{
+		threshold = Math.abs(threshold);
+		clamp = Math.abs(clamp);
+		maxInput = Math.abs(maxInput);
+		if(toDonut == 0)
+		{
+			return 0;
+		}
+		
+		//range check
+		if(toDonut > clamp || toDonut > maxInput)
+		{
+			return Math.min(clamp, maxInput);
+		}
+		if(toDonut < -clamp || toDonut < -maxInput)
+		{
+			return -Math.min(clamp, maxInput);
+		}
+		
+		//calc factors
+		double newRange = maxInput - threshold;
+		double factor = newRange/maxInput;//maxInput is the old range (maxInput - 0)
+
+		if(toDonut > 0)
+		{
+			return toDonut*factor + threshold;
+		}
+		return toDonut*factor - threshold;
+	}
+	
 	/**
 	 * Extracts the double value from a string.
 	 * @param mess the string to be parsed

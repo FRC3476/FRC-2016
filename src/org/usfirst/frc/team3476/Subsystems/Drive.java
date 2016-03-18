@@ -4,11 +4,15 @@ import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Utility.ManualHandler;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
+import org.usfirst.frc.team3476.Utility.Control.AsymmetricalRamper;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
+import org.usfirst.frc.team3476.Utility.Control.DonutDrive;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoderPair;
 import org.usfirst.frc.team3476.Utility.Control.PIDOutputWrapper;
+import org.usfirst.frc.team3476.Utility.Control.Ramper;
+import org.usfirst.frc.team3476.Utility.Control.SimpleRamper;
 
 import edu.wpi.first.wpilibj.PIDController;
 import edu.wpi.first.wpilibj.PIDSource;
@@ -20,22 +24,32 @@ import edu.wpi.first.wpilibj.interfaces.Gyro;
 public class Drive implements Subsystem
 {
 	private final String[] autoCommands = {"turn", "drive", "driven", "shiftit", "clear"};
-	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT", "USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP", "DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED", "SHIFTINGHYS", "DRIVEOUTPUTRANGE", "STRAIGHTOUTPUTRANGE", "TURNTIMEOUT", "TURNDONUTTHRESHOLD", "TURNCLAMP", "DONETIME"};
+	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT",
+										"USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP",
+										"DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED",
+										"SHIFTINGHYS", "DRIVEOUTPUTRANGE", "STRAIGHTOUTPUTRANGE",
+										"TURNTIMEOUT", "TURNDONUT", "TURNCLAMP", "DONETIME", "STRAIGHTDONUT",
+										"ACCELRATE", "DECELRATE", "UNITSPERSEC"};
 	final int ENCODERSAMPLES = 16;
 	final long MANUALTIMEOUT = 50;//in ms
 	final double SLOWSPEED = 0.4, SPECIALDIST = 12.0;
 	
 	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear;
 	private double scaledTurnTimeout;
-	private double DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND, STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE, STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUTTHRESHOLD, TURNCLAMP, DONETIME;
+	private double 	DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND,
+					STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE,
+					STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUT, TURNCLAMP, DONETIME, STRAIGHTDONUT,
+					ACCELRATE, DECELRATE, UNITSPERSEC;
 	
 	private ManualHandler driveManual, shifterManual;
+	
+	AsymmetricalRamper driveRamp;
 	
 	private MedianEncoder left, right;
 	private MedianEncoderPair both;
 	private Gyro gyro;
 	private RunningAverage encoderAvg, avgRate;
-	private RobotDrive driveTrain;
+	private DonutDrive driveTrain;
 	private Solenoid shifters;
 	
 	private PIDController drive, turn, straightTurn;
@@ -51,7 +65,8 @@ public class Drive implements Subsystem
 	Timer doneTimer;
 	Timer mainTimer;
 	
-	public Drive(MedianEncoder leftin, MedianEncoder rightin, Gyro gyroin, RobotDrive driveTrainin, Solenoid shiftersin)
+	public Drive(MedianEncoder leftin, MedianEncoder rightin, Gyro gyroin, DonutDrive driveTrainin,
+			Solenoid shiftersin)
 	{
 		done = true;
 		driveStraight = true;
@@ -100,6 +115,8 @@ public class Drive implements Subsystem
 		driveThread.start();
 		
 		driveManual = new ManualHandler(MANUALTIMEOUT);
+		
+		driveRamp = new AsymmetricalRamper();
 	}
 	
 	@Override
@@ -194,11 +211,25 @@ public class Drive implements Subsystem
 		i++;//18
 		TURNTIMEOUT = constantsin[i];
 		i++;//19
-		TURNDONUTTHRESHOLD = constantsin[i];
+		TURNDONUT = constantsin[i];
 		i++;//20
 		TURNCLAMP = constantsin[i];
 		i++;//21
 		DONETIME = constantsin[i];
+		i++;//22
+		STRAIGHTDONUT = constantsin[i];
+		i++;//23
+		ACCELRATE = constantsin[i];
+		i++;//24
+		DECELRATE = constantsin[i];
+		i++;//25
+		UNITSPERSEC = constantsin[i];
+		
+		driveRamp.setUnitspersecond(UNITSPERSEC != 0);
+		driveRamp.setAccelRate(ACCELRATE);
+		driveRamp.setDecelRate(DECELRATE);
+		
+		driveTrain.setDonutParams(STRAIGHTDONUT, TURNDONUT);
 		
 		//System.out.println("P: " + TURNP + " I: " + TURNI + " D: " + TURND + " Isvalid: " + constantsin.length);
 		both.setUse(USELEFT, USERIGHT);
@@ -209,6 +240,8 @@ public class Drive implements Subsystem
 	{
 		if(driveManual.isTimeUp())
 		{
+			driveTrain.setClamp(1);
+			driveTrain.setScale(false);
 			if(!clear)
 			{
 					if (!done)
@@ -233,7 +266,7 @@ public class Drive implements Subsystem
 							if(mainTimer.get() > scaledTurnTimeout) done = true;
 							//System.out.print("Turning with output: " + turnWrapper.getOutput() + "  ");
 							//System.out.println("Gyro: "  + gyro.calcDiff());
-							driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUTTHRESHOLD));
+							driveTrain.arcadeDrive(0, OrangeUtility.donut(turnWrapper.getOutput(), TURNDONUT));
 						}
 						
 						//Check if we're done here 
@@ -263,6 +296,8 @@ public class Drive implements Subsystem
 		}
 		else//manual override
 		{
+			driveTrain.setClamp(1);
+			driveTrain.setScale(true);
 		}
 		
 		if(shifterManual.isTimeUp())
@@ -308,7 +343,7 @@ public class Drive implements Subsystem
 		turn.setSetpoint(delta);
 		turn.setPID(TURNP, TURNI, TURND);
 		//subtraction so that the output to the arcade drive does not exceed TURNCLAMP after scaling by donut
-		turn.setOutputRange(TURNDONUTTHRESHOLD - TURNCLAMP, TURNCLAMP - TURNDONUTTHRESHOLD);
+		turn.setOutputRange(TURNDONUT - TURNCLAMP, TURNCLAMP - TURNDONUT);
 		turn.enable();
 	}
 	
@@ -368,6 +403,23 @@ public class Drive implements Subsystem
 	{
 		driveManual.poke();
 		driveTrain.arcadeDrive(move, rotate);
+	}
+	
+	/**
+	 * Controls the drive base with augmented arcade drive values.
+	 * @param move the joystick y axis
+	 * @param rotate the joystick x axis
+	 */
+	public void augmentedDrive(double move, double rotate)
+	{
+		move = driveRamp.doubleAction(move);
+		
+		manualDrive(move, rotate);
+	}
+	
+	public void resetRamp()
+	{
+		driveRamp.reset();
 	}
 	
 	/**

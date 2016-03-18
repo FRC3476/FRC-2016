@@ -32,12 +32,14 @@ import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialAnalogGyro;
 import org.usfirst.frc.team3476.Utility.Control.DifferentialSPIGyro;
 import org.usfirst.frc.team3476.Utility.Control.DonutCANTalon;
+import org.usfirst.frc.team3476.Utility.Control.DonutDrive;
+import org.usfirst.frc.team3476.Utility.Control.DonutTalon;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDCounterPeriodWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
-import org.usfirst.frc.team3476.Utility.Control.Ramper;
+import org.usfirst.frc.team3476.Utility.Control.SimpleRamper;
 
 import com.ni.vision.VisionException;
 
@@ -84,10 +86,11 @@ public class Robot extends IterativeRobot
 	//Flywheel constants
 	final double FLY1 = -1, FLY2 = 1;
 	
-	RobotDrive drive = new RobotDrive(2, 3, 0, 1);
+	//Drive
+	DonutDrive drive = new DonutDrive(2, 3, 0, 1);
 
 	Solenoid shifterSoleniod = new Solenoid(0);
-	Solenoid hood = new Solenoid(1);
+	Solenoid hood = new Solenoid(1), wheelie = new Solenoid(2);
 	
 	enum Mode {DEFAULT, INTAKE, SHOOTCLOSE, SHOOTFAR, SHOOTFLEX}
     Mode mode = Mode.DEFAULT;
@@ -112,7 +115,7 @@ public class Robot extends IterativeRobot
     
     AnalogInput pressure = new AnalogInput(3), ballsensor = new AnalogInput(2);
     
-    AtoD loaderSwitch = new AtoD(ballsensor, 0.5, false);
+    AtoD loaderSwitch = new AtoD(ballsensor, 0.65, false);
     
     DigitalInput banner = new DigitalInput(1);
     PIDCounterPeriodWrapper tach = new PIDCounterPeriodWrapper(banner, 60);
@@ -121,7 +124,6 @@ public class Robot extends IterativeRobot
     Thread starterThread;
     
     Toggle hoodToggle = new Toggle();
-    Ramper driveRamp = new Ramper(0.25, false, 0);
     
     int iters = 0;
     int threads = 0;
@@ -134,10 +136,15 @@ public class Robot extends IterativeRobot
     
     boolean homed = false;
     
+    final boolean autodropdown = true;
+    
     boolean automatic = true;
     
     boolean shooterdatacollect = false;
     ShooterLogger shooterLogger;
+    
+    boolean[] 	joybuttons = new boolean[13], xboxbuttons = new boolean[11],
+    			lastjoybuttons = new boolean[joybuttons.length], lastxboxbuttons = new boolean[xboxbuttons.length];
     
     double joysetpoint;
     int joycount;
@@ -145,6 +152,7 @@ public class Robot extends IterativeRobot
 	private double testset = 0;
 	private boolean posmove;
 	private double watchset;
+	private boolean rehome = false;
     
     /**
      * This function is run when the robot is first started up and should be
@@ -200,6 +208,12 @@ public class Robot extends IterativeRobot
 		//misc init
 		((Clock)systems[9]).megaEnd();
 		((Drive)systems[0]).autoShifting(false);
+    	
+    	if(!autodropdown)
+    	{
+    		((Intake)systems[3]).stopHoming();
+    		((Intake)systems[3]).stopDD();
+    	}
 		
 		//Main
 		main = new Main();
@@ -238,6 +252,9 @@ public class Robot extends IterativeRobot
     		main.startSubsystems();
     		main.startThread();
     		first = false;
+    		
+    		Dashcomm.putBoolean("match/enabled", true);
+    		
     	}
     	
     	if(Timer.getMatchTime() > 15.0) main.stop();
@@ -262,6 +279,9 @@ public class Robot extends IterativeRobot
 				main.stopSubsystems();//Stop auto threads, we're not in auto
 				main.stop();
 				first = false;
+				
+				Dashcomm.putBoolean("match/enabled", false);
+				
 			}
 			if(camfirst && starter.cameraDone())
 			{
@@ -295,29 +315,35 @@ public class Robot extends IterativeRobot
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
     		//intake pos constants
-    		final double up = 295, horiz = 4630, down = 5505;
+    		final double up = 295, horiz = 4630, down = 5705;
     		
-    		final double FLYWHEELMAX = 8900;
+    		final double FLYWHEELMAX = 9100;
     		
-    		final double CLOSESPEED = 6750, FARSPEED = 7500;
+    		final double CLOSESPEED = 6750, FARSPEED = 7300;
     		
     		//prints
-    		boolean axisprint = false,  tachprint = false, currentprint = false,
+    		boolean axisprint = false,  tachprint = true, currentprint = false,
     				pressureprint = false, driveencoderprint = false, spigyroprint = false,
     				intakeenc = false, shooterout = false, ballsensorprint = false,
     				distanceprint = false, shootervdist = false, povprint = false,
-    				turretencoderprint = false, loaderstateprint = false;
+    				turretencoderprint = false, loaderstateprint = false, xboxaxisprint = false;
     		
     		//others
-    		boolean turretgo = true, buttons = false, autodropdown = true,
-    				distmode = false, searchgo = false, manualLoad = false;
+    		boolean turretgo = true, buttons = false, distmode = false,
+    				searchgo = false, manualLoad = false, ddtuning = false;
     		
-    		boolean[] joybuttons = new boolean[13];
-    		
-    		for(int i = 1; i <= 12; i++)
+    		for(int i = 1; i < joybuttons.length; i++)
     		{
     			joybuttons[i] = joy.getRawButton(i);
     		}
+    		
+    		for(int i = 1; i < xboxbuttons.length; i++)
+    		{
+    			xboxbuttons[i] = xbox.getRawButton(i);
+    		}
+    		
+    		double 	xAxis = -xbox.getRawAxis(4),
+	    			yAxis = -xbox.getRawAxis(1);
     		
     		boolean joy1 = joy.getRawButton(1), joy2 = joy.getRawButton(2);
     		
@@ -354,21 +380,19 @@ public class Robot extends IterativeRobot
 						{
 							turret.aim(0);
 						}
-						
-						driveRamp.reset();
 					}
 					else
 					{
 						turret.killHomer();
 					}
 					
+					Dashcomm.putBoolean("match/enabled", true);
+					
 					
 	    		default://!first - Normal execution
 	    			if(automatic)
 	    			{
-	    				double 	xAxis = -xbox.getRawAxis(4),
-	    		    			yAxis = -xbox.getRawAxis(1);
-	    				drive.manualDrive(driveRamp.doubleAction(yAxis), xAxis);
+	    				drive.augmentedDrive(yAxis, xAxis);
 	    				
 	    				if(joybuttons[8])
 	    				{
@@ -410,14 +434,17 @@ public class Robot extends IterativeRobot
 	    				}
 	    				else if(joybuttons[3])
 	    				{
-	    					intake.manualIntake(1);
+	    					shooter.intakeNotify(true);
+	    					intake.manualIntake(1*shooter.getIntakeScaling());
 	    				}
 	    				else if(joybuttons[5])
 	    				{
-	    					intake.manualIntake(-1);
+	    					shooter.intakeNotify(true);
+	    					intake.manualIntake(-1*shooter.getIntakeScaling());
 	    				}
 	    				else
 						{
+	    					shooter.intakeNotify(false);
 	    					intake.manualIntake(0);
 						}
 	    				
@@ -454,7 +481,7 @@ public class Robot extends IterativeRobot
 		    		    			}
 		    		    			else//nondist
 		    		    			{
-		    		    				System.out.println("Flyset: " + ((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
+		    		    				//System.out.println("Flyset: " + ((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
 		    		    				shooter.setFly(((-joy.getRawAxis(3) + 1)/2)*FLYWHEELMAX);
 		    		    			}
 		    						break;
@@ -471,93 +498,108 @@ public class Robot extends IterativeRobot
 	    				
 	    				if(turretgo)
 	    				{
-	    					if(buttons)
+	    					if(xboxbuttons[7] && !lastxboxbuttons[7])//button 7 just pressed
 	    					{
-				    			if(joy.getRawButton(1))
-				    			{
-				    				turret.aim(0);
-				    			}
-				    			if(joy.getRawButton(7))
-				    			{
-				    				turret.aim(0.25);
-				    			}
-				    			if(joy.getRawButton(8))
-				    			{
-				    				turret.aim(-0.25);
-				    			}
-				    			if(joy.getRawButton(9))//bed tings
-				    			{
-				    				turret.aim(0.65);
-				    			}
-				    			if(joy.getRawButton(10))//bed tings
-				    			{
-				    				turret.aim(-0.65);
-				    			}
+	    						//start homing
+	    						turret.resetHomer();
+	    						rehome = true;
 	    					}
-	    					else if(searchgo)//search testing
+	    					else if(!xboxbuttons[7] && lastxboxbuttons[7])
 	    					{
-	    						if(joy2 && !lastJoy2)
-    							{
-	    							turret.search(-0.1);
-    							}
-	    						else if(!turret.isSearching())
-	    						{
-	    							turret.aim();
-	    						}
+	    						turret.killHomer();
+	    						rehome = false;
 	    					}
-	    					else//joystick setpoint
+	    					
+	    					if(!rehome)
 	    					{
-	    						//if(intake.intakeRunning()) POV = 0;//turn the turret if the intake is running
-	    						switch(POV)
-    							{
-	    							case -1://nothing
-	    								watchset = Double.NaN;
-	    								posmove = false;
-	    								break;
-	    								
-	    							default:
-	    								watchset = POV/360.0 + 0.000000001;
-	    								posmove = true;
-    							}
-	    						
-	    						if(posmove)//moving to position
-	    						{
-	    							if(turret.isAutoDone() && turret.getTurretSet() == watchset)//posmove done
+	    						if(buttons)
+		    					{
+					    			if(joy.getRawButton(1))
+					    			{
+					    				turret.aim(0);
+					    			}
+					    			if(joy.getRawButton(7))
+					    			{
+					    				turret.aim(0.25);
+					    			}
+					    			if(joy.getRawButton(8))
+					    			{
+					    				turret.aim(-0.25);
+					    			}
+					    			if(joy.getRawButton(9))//bed tings
+					    			{
+					    				turret.aim(0.65);
+					    			}
+					    			if(joy.getRawButton(10))//bed tings
+					    			{
+					    				turret.aim(-0.65);
+					    			}
+		    					}
+		    					else if(searchgo)//search testing
+		    					{
+		    						if(joy2 && !lastJoy2)
 	    							{
-	    								posmove = false;
+		    							turret.search(-0.1);
 	    							}
-	    							else//not there yet, set it yo
-	    							{
-	    								turret.aim(watchset);
-	    							}
-	    						}
-	    						else//joystick setpoint
-	    						{
-		    						if(joy.getRawButton(2))
+		    						else if(!turret.isSearching())
 		    						{
-		    							if(!lastJoy2)
-		    							{
-		    								turret.printPID();
-		    							}
 		    							turret.aim();
 		    						}
-		    						else
+		    					}
+		    					else//joystick setpoint
+		    					{
+		    						//if(intake.intakeRunning()) POV = 0;//turn the turret if the intake is running
+		    						switch(POV)
+	    							{
+		    							case -1://nothing
+		    								watchset = Double.NaN;
+		    								posmove = false;
+		    								break;
+		    								
+		    							default:
+		    								watchset = POV/360.0 + 0.000000001;
+		    								posmove = true;
+	    							}
+		    						
+		    						if(posmove)//moving to position
 		    						{
-		    							if(lastJoy2)
+		    							if(turret.isAutoDone() && turret.getTurretSet() == watchset)//posmove done
 		    							{
-		    								joysetpoint = turret.getTurretEncoder().getDistance();
+		    								posmove = false;
 		    							}
-		    							if(Math.abs(joy.getRawAxis(0)) > 0.1)
-			    							joysetpoint += joy.getRawAxis(0)*0.01;
-		    							else
+		    							else//not there yet, set it yo
 		    							{
-		    								joysetpoint = turret.getTurretEncoder().getDistance();
-		    								System.out.println("joysetpoint: " + joysetpoint);
+		    								turret.aim(watchset);
 		    							}
-			    						
-		    							turret.aim(joysetpoint);
 		    						}
-	    						}
+		    						else//joystick setpoint
+		    						{
+			    						if(joy.getRawButton(2))
+			    						{
+			    							if(!lastJoy2)
+			    							{
+			    								turret.printPID();
+			    							}
+			    							turret.aim();
+			    						}
+			    						else
+			    						{
+			    							if(lastJoy2)
+			    							{
+			    								joysetpoint = turret.getTurretEncoder().getDistance();
+			    							}
+			    							if(Math.abs(joy.getRawAxis(0)) > 0.1)
+				    							joysetpoint += joy.getRawAxis(0)*0.01;
+			    							else
+			    							{
+			    								joysetpoint = turret.getTurretEncoder().getDistance();
+			    								//System.out.println("joysetpoint: " + joysetpoint);
+			    							}
+				    						
+			    							turret.aim(joysetpoint);
+			    						}
+		    						}
+		    					}
 	    					}
 	    				}
 	    				else
@@ -571,22 +613,57 @@ public class Robot extends IterativeRobot
 		    			
 	    				if(autodropdown)
 	    				{
-		    				if(joy.getRawButton(7))
-		    				{
-		    					intake.moveDropdown(up);
-		    				}
-		    				else if(joy.getRawButton(9))
-		    				{
-		    					intake.moveDropdown(horiz);
-		    				}
-		    				else if(joy.getRawButton(11))
-		    				{
-		    					intake.moveDropdown(down);
-		    				}
+	    					if(ddtuning)
+	    					{
+	    						if(joybuttons[1])
+	    						{
+	    							if(joy.getRawButton(7))
+				    				{
+				    					intake.moveDropdown(up);
+				    				}
+				    				else if(joy.getRawButton(9))
+				    				{
+				    					intake.moveDropdown(horiz);
+				    				}
+				    				else if(joy.getRawButton(11))
+				    				{
+				    					intake.moveDropdown(down);
+				    				}
+	    						}
+	    						else
+								{
+	    							intake.stopDD();
+								}
+	    					}
+	    					else
+	    					{
+	    						if(joy.getRawButton(7))
+			    				{
+			    					intake.moveDropdown(up);
+			    				}
+			    				else if(joy.getRawButton(9))
+			    				{
+			    					intake.moveDropdown(horiz);
+			    				}
+			    				else if(joy.getRawButton(11))
+			    				{
+			    					intake.moveDropdown(down);
+			    				}
+	    					}
 	    				}
 	    				else//manual dropdown
 	    				{
+	    					intake.stopDD();
 	    					intake.manualDropdown(-joy.getRawAxis(1));//yaxis
+	    				}
+	    				
+	    				if(xbox.getRawButton(1))//a - extend
+	    				{
+	    					wheelie.set(true);
+	    				}
+	    				else if(xbox.getRawButton(3))//x - retract
+	    				{
+	    					wheelie.set(false);
 	    				}
 		    			
 		    			if(shooterdatacollect)
@@ -617,7 +694,6 @@ public class Robot extends IterativeRobot
 		    			}
 		    			else
 		    			{
-		    				shooter.intakeNotify(intake.intakeRunning());
 			    			if(joy.getRawButton(1)) shooter.startFire();
 		    			}
 		    			
@@ -628,8 +704,6 @@ public class Robot extends IterativeRobot
     				}
 	    			else//manual
 	    			{
-	    				double 	xAxis = -xbox.getRawAxis(4),
-	    		    			yAxis = -xbox.getRawAxis(1);
 	    				boolean calibrate = false;
 	    				
 	    				if(calibrate)
@@ -705,6 +779,9 @@ public class Robot extends IterativeRobot
 	    				//System.out.println("Banner: " + banner.get());
 	    			}
 	    			
+	    			Dashcomm.putNumber("data/flywheel/tachometer", 60/tach.getPeriod());
+	    			Dashcomm.putNumber("data/flywheel/setpoint", shooter.getFlySet());
+	    			
 	    			if(loaderstateprint)
 	    			{
 	    				System.out.println("Loader State: " + shooter.getLoaderState());
@@ -713,6 +790,11 @@ public class Robot extends IterativeRobot
 	    			if(turretencoderprint)
 	    			{
 	    				System.out.println("Turret encoder: " + turret.getTurretEncoder().getDistance());
+	    			}
+	    			
+	    			if(xboxaxisprint)
+	    			{
+	    				System.out.println("Xbox x: " + xAxis + ", Xbox y:" + yAxis);
 	    			}
 	    			
 	    			if(povprint)
@@ -738,9 +820,20 @@ public class Robot extends IterativeRobot
 	    			if(currentprint)
 	    			{
 	    				String print = "";
-	    				for(int i = 0; i < 13; i++)
+	    				
+	    				boolean one = true;
+	    				
+	    				if(one)
 	    				{
-	    					print += "Channel " + i + ": " + pdp.getCurrent(i) + "\n";
+	    					int channel = 2;
+	    					print += "Channel " + channel + ": " + pdp.getCurrent(channel) + "\n";
+	    				}
+	    				else
+	    				{
+	    					for(int i = 0; i < 13; i++)
+		    				{
+		    					print += "Channel " + i + ": " + pdp.getCurrent(i) + "\n";
+		    				}
 	    				}
 	    				System.out.print(print);
 	    			}
@@ -784,21 +877,22 @@ public class Robot extends IterativeRobot
     					System.out.println("Left: " + leftDrive.getDistance());
     					System.out.println("Right: " + rightDrive.getDistance());
     				}
-    				
-	    			//drive.manualDrive(yAxis, xAxis);
-	    			//shooter.manualTurret(joy.getAxis(AxisType.kX));
-	    			//turret.set(joy.getAxis(AxisType.kX));
-	    			/*ystem.out.println("Joy: " + joy.getAxis(AxisType.kX));
-	    			System.out.println("Encoder: " + turret.getPosition());
-	    			System.out.println("DIO: " + banner.get());
-	    			System.out.println("Hall: " + halleffect.get());*/
-	    			
-	    			//System.out.println("SPI Gyro: " + spiGyro.get());
-    		}
-		}
+    		}//end time switch
+		}//end importantdone
     	lastPOV = POV;
     	lastJoy = joy.getRawButton(1);
     	lastJoy2 = joy.getRawButton(2);
+    	
+    	for(int i = 1; i < lastjoybuttons.length; i++)
+		{
+    		lastjoybuttons[i] = joybuttons[i];
+		}
+		
+		for(int i = 1; i < lastxboxbuttons.length; i++)
+		{
+			lastxboxbuttons[i] = xboxbuttons[i];
+		}
+		
     	iters++;
     }
     
