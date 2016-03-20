@@ -108,7 +108,6 @@ public class Shooter implements Subsystem
 		//Shooter
 		fly1 = fly1in;
 		fly2 = fly2in;
-		flyDone = true;
 		loadDone = true;
 		tach = tachin;
 		tachavg = new RunningAverage(8);
@@ -130,8 +129,10 @@ public class Shooter implements Subsystem
 		loader = loaderin;
 		loaderState = LoaderState.WAITING;
 		prevstate = LoaderState.RELOADINGFAST;
-		loadDone = true;
-		fireDone = true;
+		
+		flyDone = false;
+		loadDone = false;
+		fireDone = false;
 		
 		//Hood
 		this.hood = hood;
@@ -156,6 +157,7 @@ public class Shooter implements Subsystem
 	public synchronized void doAuto(double[] params, String command)
 	{
 		lastCommand = command;
+		System.out.println(command);
 		switch(command)
 		{
 			case "shooter":

@@ -29,17 +29,16 @@ public class Drive implements Subsystem
 										"DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED",
 										"SHIFTINGHYS", "DRIVEOUTPUTRANGE", "STRAIGHTOUTPUTRANGE",
 										"TURNTIMEOUT", "TURNDONUT", "TURNCLAMP", "DONETIME", "STRAIGHTDONUT",
-										"ACCELRATE", "DECELRATE", "UNITSPERSEC"};
+										"ACCELRATE", "DECELRATE", "UNITSPERSEC", "SLOWSPEED", "SPECIALDIST"};
 	final int ENCODERSAMPLES = 16;
 	final long MANUALTIMEOUT = 50;//in ms
-	final double SLOWSPEED = 0.4, SPECIALDIST = 12.0;
 	
 	private boolean done, driveStraight, simple, autoShifting, USELEFT, USERIGHT, clear;
 	private double scaledTurnTimeout;
 	private double 	DRIVEDEAD, DRIVESTRAIGHTDEAD, TURNDEAD, DRIVEP, DRIVEI, DRIVED, TURNP, TURNI, TURND,
 					STRAIGHTP, STRAIGHTI, STRAIGHTD, SHIFTINGSPEED, SHIFTINGHYS, DRIVEOUTPUTRANGE,
 					STRAIGHTOUTPUTRANGE, TURNTIMEOUT, TURNDONUT, TURNCLAMP, DONETIME, STRAIGHTDONUT,
-					ACCELRATE, DECELRATE, UNITSPERSEC;
+					ACCELRATE, DECELRATE, UNITSPERSEC, SLOWSPEED, SPECIALDIST;
 	
 	private ManualHandler driveManual, shifterManual;
 	
@@ -64,10 +63,12 @@ public class Drive implements Subsystem
 	
 	Timer doneTimer;
 	Timer mainTimer;
+	private boolean autoDone;
 	
 	public Drive(MedianEncoder leftin, MedianEncoder rightin, Gyro gyroin, DonutDrive driveTrainin,
 			Solenoid shiftersin)
 	{
+		autoDone = false;
 		done = true;
 		driveStraight = true;
 		simple = false;
@@ -130,6 +131,7 @@ public class Drive implements Subsystem
 	{
 		autoShifting = false;
 		done = false;
+		autoDone = false;
 		clear = false;
 		mainTimer.reset();
 		mainTimer.start();
@@ -160,7 +162,7 @@ public class Drive implements Subsystem
 	@Override
 	public synchronized boolean isAutoDone()
 	{
-		return done;
+		return autoDone;
 	}
 
 	@Override
@@ -224,6 +226,10 @@ public class Drive implements Subsystem
 		DECELRATE = constantsin[i];
 		i++;//25
 		UNITSPERSEC = constantsin[i];
+		i++;//26
+		SLOWSPEED = constantsin[i];
+		i++;//27
+		SPECIALDIST = constantsin[i];
 		
 		driveRamp.setUnitspersecond(UNITSPERSEC != 0);
 		driveRamp.setAccelRate(ACCELRATE);
@@ -256,7 +262,7 @@ public class Drive implements Subsystem
 							{
 								double bangbang = specialBangBang(both.getDistance());
 								//System.out.println("Simple drive with bang bang: " + bangbang + " error: " + driven.getError(both.getDistance()));
-								System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
+								//System.out.println("Straight drive: " + straightTurn.get() + " error: " + straightTurn.getError());
 								driveTrain.arcadeDrive(bangbang, straightWrapper.getOutput());
 								//System.out.println("Drive setpoint: " + driven.getSetpoint() + " Current pos: " + both.getDistance());
 							}
@@ -283,6 +289,7 @@ public class Drive implements Subsystem
 						{
 							done = true;
 						}
+						autoDone = done;
 					}
 					else
 					{

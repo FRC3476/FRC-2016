@@ -63,8 +63,6 @@ public class DonutDrive extends RobotDrive
 	{
 		if(scale)
 		{
-			System.out.println("move: " + OrangeUtility.scalingDonut(moveValue, driveDonutThreshold, clamp, 1));
-			System.out.println("rotate: " + OrangeUtility.scalingDonut(rotateValue, rotateDonutThreshold, clamp, 1));
 			super.arcadeDrive(OrangeUtility.scalingDonut(moveValue, driveDonutThreshold, clamp, 1), OrangeUtility.scalingDonut(rotateValue, rotateDonutThreshold, clamp, 1));//we know the max(min) is 1 cause this is a motor
 		}
 		else

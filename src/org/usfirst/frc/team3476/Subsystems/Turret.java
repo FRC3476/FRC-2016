@@ -80,11 +80,14 @@ public class Turret implements Subsystem
 
 	private boolean waitingforhome;
 
+	private boolean turretautodone;
+
 	public Turret(DonutCANTalon turretin, DigitalInput halleffectin, PIDDashdataWrapper visionin)
 	{
 		//Turret setup
 		turret = turretin;
 		turretdone = true;
+		turretautodone = false;
 		aimmode = AimMode.ENCODER;
 		softlimitsPassed = false;
 		softDir = 1;
@@ -424,7 +427,10 @@ public class Turret implements Subsystem
 						case ENCODER:
 							//If first exec, make sure we're using the right control
 							//System.out.println("Lastturretdone: " + lastturretdone);
-							conditionalEnable();
+							if(!searchdone)
+							{
+								conditionalEnable();
+							}
 							//System.out.println("Enable: " + turretencodercontrol.isEnabled() + ", Mode: " + aimmode);
 							
 							String print = "";
@@ -501,6 +507,7 @@ public class Turret implements Subsystem
 							timereport += "targetchk: " + (System.nanoTime() - startTime) + "\n";
 							break;
 					}
+					turretautodone = turretdone;
 				}
 				else
 				{

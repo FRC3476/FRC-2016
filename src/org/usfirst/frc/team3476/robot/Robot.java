@@ -167,11 +167,11 @@ public class Robot extends IterativeRobot
     	drive.setInvertedMotor(RobotDrive.MotorType.kRearLeft, true);
     	drive.setInvertedMotor(RobotDrive.MotorType.kRearRight, true);
     	
-    	leftDrive.setDistancePerPulse(0.01308996938995747182692768076366);
-    	rightDrive.setDistancePerPulse(0.01308996938995747182692768076366);
+    	leftDrive.setDistancePerPulse(0.05235987755982988730771072305464);
+    	rightDrive.setDistancePerPulse(0.05235987755982988730771072305464);
     	
-    	intake1.setInverted(true);
-    	intake2.setInverted(true);
+    	intake1.setInverted(false);
+    	intake2.setInverted(false);
     	
     	tach.setSamplesToAverage(4);
     	spiGyro.calibrate();
@@ -183,9 +183,7 @@ public class Robot extends IterativeRobot
     	
     	if(!automatic)
     	{
-    		flyTalon2.setInverted(true);
     		ddmotor.setInverted(true);
-        	loaderTalon.setInverted(true);
     	}
     	
     	if(shooterdatacollect)
@@ -319,10 +317,10 @@ public class Robot extends IterativeRobot
     		
     		final double FLYWHEELMAX = 9100;
     		
-    		final double CLOSESPEED = 6750, FARSPEED = 7300;
+    		final double CLOSESPEED = 6750, FARSPEED = 6750;
     		
     		//prints
-    		boolean axisprint = false,  tachprint = true, currentprint = false,
+    		boolean axisprint = false,  tachprint = false, currentprint = false,
     				pressureprint = false, driveencoderprint = false, spigyroprint = false,
     				intakeenc = false, shooterout = false, ballsensorprint = false,
     				distanceprint = false, shootervdist = false, povprint = false,
@@ -637,6 +635,10 @@ public class Robot extends IterativeRobot
 	    					}
 	    					else
 	    					{
+	    						if(xboxbuttons[8] && !lastxboxbuttons[8])
+	    						{
+	    							intake.home();
+	    						}
 	    						if(joy.getRawButton(7))
 			    				{
 			    					intake.moveDropdown(up);

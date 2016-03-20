@@ -16,7 +16,7 @@ import edu.wpi.first.wpilibj.Timer;
 
 public class Intake implements Subsystem
 {
-	private double SUCKMOTORSPEED, LOADMOTORSPEED, ddTime, INTAKE1DIR, INTAKE2DIR, DDCONTROLP,
+	private double SUCKMOTORSPEED, LOADMOTORSPEED, INTAKE1DIR, INTAKE2DIR, DDCONTROLP,
 	DDCONTROLI, DDCONTROLD, DDCONTROLDEAD, DDCONTROLOUTPUTHIGH, DDCONTROLOUTPUTLOW, DDCHANNEL,
 	INTAKEHOMINGCURRENT, INTAKEHOMINGSPEED, DEFAULTDROPDOWNPOS;
 	
@@ -29,6 +29,8 @@ public class Intake implements Subsystem
 	private boolean done, FORWARDISDOWN, started;
 	
 	final long MANUALTIMEOUT = 50;
+	
+	final double UP = 295, HORIZ = 4630, DOWN = 5705;
 	
 	private SpeedController intake1, intake2;
 	
@@ -44,6 +46,8 @@ public class Intake implements Subsystem
 	private double ddPosition, lastposition;
 	private boolean stopdd;
 	private boolean homed;
+
+	private boolean hasDropdownSet;
 
 	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin, PowerDistributionPanel pdPanelin)
 	{
@@ -71,8 +75,9 @@ public class Intake implements Subsystem
 		intakeManual = new ManualHandler(MANUALTIMEOUT);
 		
 		started = true;
-		done = true;
+		done = false;
 		
+		hasDropdownSet = false;
 		
 		//Thread
 		task = new SubsystemTask(this, 10);
@@ -101,16 +106,26 @@ public class Intake implements Subsystem
 		}
 		else if(command.equalsIgnoreCase("dropdown"))
 		{
+			System.out.println("Dropdown: " + (int)params[0]);
 			switch((int)params[0])
 			{
+				case 1:
+					moveDropdown(UP);
+					break;
+				case 0:
+					moveDropdown(HORIZ);
+					break;
+				case -1:
+					moveDropdown(DOWN);
+					break;	
 			}
-			ddTime = params[1];
 		}
 	}
 
 	@Override
 	public synchronized boolean isAutoDone()
 	{
+		if(done) System.out.println("Intake done");
 		return done;
 	}
 
@@ -214,6 +229,16 @@ public class Intake implements Subsystem
 					{
 						ddController.setSetpoint(ddPosition);
 					}
+					
+					
+					if(!done)
+					{
+						if(Math.abs(ddController.getError()) < DDCONTROLDEAD)
+						{
+							done = true;
+						}
+					}
+					
 					lastposition = ddPosition;
 				}
 				else
@@ -235,7 +260,8 @@ public class Intake implements Subsystem
 				{
 					ddmotor.set(0);
 					ddwrapper.reset();
-					moveDropdown(DEFAULTDROPDOWNPOS);
+					if(!hasDropdownSet)
+						moveDropdown(DEFAULTDROPDOWNPOS);
 					homed = true;
 				}
 				else
@@ -295,6 +321,11 @@ public class Intake implements Subsystem
 		homed = true;
 	}
 	
+	public void home()
+	{
+		homed = false;
+	}
+	
 	public double getDDSet()
 	{
 		return ddController.getSetpoint();
@@ -328,6 +359,7 @@ public class Intake implements Subsystem
 	public void moveDropdown(double position)
 	{
 		stopdd = false;
+		hasDropdownSet = true;
 		ddPosition = position;
 	}
 	
