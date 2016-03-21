@@ -13,6 +13,7 @@ import org.usfirst.frc.team3476.Utility.PolynomialFunction;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.AtoD;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
+import org.usfirst.frc.team3476.Utility.Control.OrangeDigital;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDCounterPeriodWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
@@ -68,7 +69,7 @@ public class Shooter implements Subsystem
 	private PIDController flywheelcontrol;
 	private PIDMotorGroup flygroup;
 	
-	private AtoD loaderSwitch;
+	private OrangeDigital loaderSwitch;
 	
 	private SubsystemTask task;
 	private Thread shooterThread;
@@ -97,7 +98,7 @@ public class Shooter implements Subsystem
 	private double lastsetvision;
 	
 	public Shooter(	SpeedController fly1in, SpeedController fly2in, SpeedController loaderin,
-					Turret turretin, PIDCounterPeriodWrapper tachin, AtoD loaderSwitchin,
+					Turret turretin, PIDCounterPeriodWrapper tachin, OrangeDigital loaderSwitch,
 					PIDDashdataWrapper vision, Solenoid hood)
 	{
 		turret = turretin;
@@ -125,7 +126,7 @@ public class Shooter implements Subsystem
 		lastCommand = "";
 		
 		//Loader
-		loaderSwitch = loaderSwitchin;
+		this.loaderSwitch = loaderSwitch;
 		loader = loaderin;
 		loaderState = LoaderState.WAITING;
 		prevstate = LoaderState.RELOADINGFAST;

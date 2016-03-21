@@ -35,6 +35,8 @@ import org.usfirst.frc.team3476.Utility.Control.DonutCANTalon;
 import org.usfirst.frc.team3476.Utility.Control.DonutDrive;
 import org.usfirst.frc.team3476.Utility.Control.DonutTalon;
 import org.usfirst.frc.team3476.Utility.Control.MedianEncoder;
+import org.usfirst.frc.team3476.Utility.Control.OrangeDigital;
+import org.usfirst.frc.team3476.Utility.Control.OrangeDigitalInput;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDCounterPeriodWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
@@ -115,7 +117,8 @@ public class Robot extends IterativeRobot
     
     AnalogInput pressure = new AnalogInput(3), ballsensor = new AnalogInput(2);
     
-    AtoD loaderSwitch = new AtoD(ballsensor, 0.65, false);
+    //AtoD loaderSwitch = new AtoD(ballsensor, 0.65, false);
+    OrangeDigital loaderSwitch = new OrangeDigitalInput(5);
     
     DigitalInput banner = new DigitalInput(1);
     PIDCounterPeriodWrapper tach = new PIDCounterPeriodWrapper(banner, 60);
@@ -138,7 +141,7 @@ public class Robot extends IterativeRobot
     
     final boolean autodropdown = true;
     
-    boolean automatic = true;
+    boolean automatic = false;
     
     boolean shooterdatacollect = false;
     ShooterLogger shooterLogger;
@@ -320,7 +323,7 @@ public class Robot extends IterativeRobot
     		final double CLOSESPEED = 6750, FARSPEED = 6750;
     		
     		//prints
-    		boolean axisprint = false,  tachprint = false, currentprint = false,
+    		boolean axisprint = false,  tachprint = true, currentprint = false,
     				pressureprint = false, driveencoderprint = false, spigyroprint = false,
     				intakeenc = false, shooterout = false, ballsensorprint = false,
     				distanceprint = false, shootervdist = false, povprint = false,
@@ -572,13 +575,12 @@ public class Robot extends IterativeRobot
 		    						}
 		    						else//joystick setpoint
 		    						{
-			    						if(joy.getRawButton(2))
+			    						if(joybuttons[2])
 			    						{
-			    							if(!lastJoy2)
+			    							if(!lastjoybuttons[2])
 			    							{
-			    								turret.printPID();
+			    								turret.aim();
 			    							}
-			    							turret.aim();
 			    						}
 			    						else
 			    						{
@@ -687,7 +689,7 @@ public class Robot extends IterativeRobot
 		    			}
 		    			else if(manualLoad)
 		    			{
-		    				if(joy1 && !lastJoy)
+		    				if(joybuttons[1] && !lastjoybuttons[1])
 		    				{
 		    					System.out.println("DOING THE LOAD HACK\n\n\n\n\n\n");
 		    					shooter.setLoaded();
@@ -728,7 +730,7 @@ public class Robot extends IterativeRobot
 	    					drive.manualDrive(yAxis, xAxis);
 	    				}
 	    				
-	    				boolean donuttest = true;
+	    				boolean donuttest = false;
 	    				
 	    				if(donuttest)
 	    				{
@@ -749,7 +751,14 @@ public class Robot extends IterativeRobot
 	    				}
 	    				
 	    				shooter.manualShooter((-joy.getRawAxis(3)+1)/2);//throttle
-	    				shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
+	    				//shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
+	    				
+	    				if(joybuttons[1] && !lastjoybuttons[1])
+	    				{
+	    					System.out.println("DOING THE LOAD HACK\n\n\n\n\n\n");
+	    					shooter.setLoaded();
+	    					shooter.startFire();
+	    				}
 	    				
 	    				if(joy.getRawButton(3))
 	    				{

@@ -2,7 +2,7 @@ package org.usfirst.frc.team3476.Utility.Control;
 
 import edu.wpi.first.wpilibj.AnalogInput;
 
-public class AtoD
+public class AtoD implements OrangeDigital
 {
 	private AnalogInput input;
 	private double threshold;
