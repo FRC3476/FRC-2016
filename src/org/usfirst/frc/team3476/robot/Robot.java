@@ -141,7 +141,7 @@ public class Robot extends IterativeRobot
     
     final boolean autodropdown = true;
     
-    boolean automatic = false;
+    boolean automatic = true;
     
     boolean shooterdatacollect = false;
     ShooterLogger shooterLogger;
@@ -312,7 +312,8 @@ public class Robot extends IterativeRobot
      */
     public void teleopPeriodic()
     {
-    	int POV = joy.getPOV(0);
+    	int joyPOV = joy.getPOV(0);
+    	int xboxPOV = xbox.getPOV(0);
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
     		//intake pos constants
@@ -323,7 +324,7 @@ public class Robot extends IterativeRobot
     		final double CLOSESPEED = 6750, FARSPEED = 6750;
     		
     		//prints
-    		boolean axisprint = false,  tachprint = true, currentprint = false,
+    		boolean axisprint = false,  tachprint = false, currentprint = true,
     				pressureprint = false, driveencoderprint = false, spigyroprint = false,
     				intakeenc = false, shooterout = false, ballsensorprint = false,
     				distanceprint = false, shootervdist = false, povprint = false,
@@ -393,8 +394,31 @@ public class Robot extends IterativeRobot
 	    		default://!first - Normal execution
 	    			if(automatic)
 	    			{
-	    				drive.augmentedDrive(yAxis, xAxis);
+	    				//===========
+	    				//===Drive===
+	    				//===========
+	    				boolean forward = xboxPOV == 0, backward = xboxPOV == 180;
+	    				if(forward || backward)//Ramparts crossing
+	    				{
+	    					if(forward)
+	    					{
+	    						drive.executeSimpleDrive(300, 70);
+	    					}
+	    					else
+	    					{
+	    						drive.executeSimpleDrive(-300, 70);
+	    					}
+	    					drive.killDriveManual();
+	    				}
+	    				else//regular drive
+	    				{
+	    					drive.augmentedDrive(yAxis, xAxis);
+	    				}
 	    				
+	    				
+	    				//=================
+	    				//===Mode Switch===
+	    				//=================
 	    				if(joybuttons[8])
 	    				{
 	    					setCameramode(CameraMode.VISION);
@@ -416,6 +440,10 @@ public class Robot extends IterativeRobot
 	    					mode = Mode.SHOOTFLEX;
 	    				}
 	    				
+	    				
+	    				//=========================
+	    				//===CameraMode Override===
+	    				//=========================
 	    				if(xbox.getRawButton(2))
 	    				{
 	    					setCameramode(CameraMode.INTAKE);
@@ -429,6 +457,10 @@ public class Robot extends IterativeRobot
 	    					shooter.manualLoader(-1);
 	    				}
 	    				
+	    				
+	    				//============
+	    				//===Intake===
+	    				//============
 	    				if(eject)
 	    				{
 	    					intake.manualIntake(-1);
@@ -449,6 +481,10 @@ public class Robot extends IterativeRobot
 	    					intake.manualIntake(0);
 						}
 	    				
+	    				
+	    				//=============
+	    				//===Shooter===
+	    				//=============
 	    				if(eject)
 	    				{
 	    					shooter.manualShooter(-1);
@@ -497,6 +533,10 @@ public class Robot extends IterativeRobot
 		    				}
 	    				}
 	    				
+	    				
+	    				//============
+	    				//===Turret===
+	    				//============
 	    				if(turretgo)
 	    				{
 	    					if(xboxbuttons[7] && !lastxboxbuttons[7])//button 7 just pressed
@@ -550,7 +590,7 @@ public class Robot extends IterativeRobot
 		    					else//joystick setpoint
 		    					{
 		    						//if(intake.intakeRunning()) POV = 0;//turn the turret if the intake is running
-		    						switch(POV)
+		    						switch(joyPOV)
 	    							{
 		    							case -1://nothing
 		    								watchset = Double.NaN;
@@ -558,7 +598,7 @@ public class Robot extends IterativeRobot
 		    								break;
 		    								
 		    							default:
-		    								watchset = POV/360.0 + 0.000000001;
+		    								watchset = joyPOV/360.0 + 0.000000001;
 		    								posmove = true;
 	    							}
 		    						
@@ -611,6 +651,10 @@ public class Robot extends IterativeRobot
 		    			//shooter.manualShooter(0);
 		    			//shooter.manualLoader(joy.getRawButton(1) ? 1 : 0);
 		    			
+	    				
+	    				//==============
+	    				//===Dropdown===
+	    				//==============
 	    				if(autodropdown)
 	    				{
 	    					if(ddtuning)
@@ -661,15 +705,24 @@ public class Robot extends IterativeRobot
 	    					intake.manualDropdown(-joy.getRawAxis(1));//yaxis
 	    				}
 	    				
-	    				if(xbox.getRawButton(1))//a - extend
+	    				
+	    				//=================
+	    				//===Wheelie Bar===
+	    				//=================
+	    				if(xboxbuttons[1])//a - extend
 	    				{
 	    					wheelie.set(true);
 	    				}
-	    				else if(xbox.getRawButton(3))//x - retract
+	    				else if(xboxbuttons[3])//x - retract
 	    				{
 	    					wheelie.set(false);
 	    				}
 		    			
+	    				
+	    				//==========================
+	    				//===Shooter Data Logging===
+	    				//=======and Loading========
+	    				//==========================
 		    			if(shooterdatacollect)
 		    			{
 		    				if(joy1 && !lastJoy)
@@ -682,7 +735,7 @@ public class Robot extends IterativeRobot
 		    					shooterLogger.logPrepped();
 		    				}
 		    				
-		    				if(shooterdatacollect && POV == 180 && lastPOV != 180)
+		    				if(shooterdatacollect && joyPOV == 180 && lastPOV != 180)
 		    				{
 		    					System.out.println(shooterLogger);
 		    				}
@@ -701,10 +754,10 @@ public class Robot extends IterativeRobot
 			    			if(joy.getRawButton(1)) shooter.startFire();
 		    			}
 		    			
+		    			//==============
+		    			//===Shifting===
+		    			//==============
 		    			drive.setShifterState(xbox.getRawAxis(3) > 0.5 ? ShiftingState.HIGH : ShiftingState.LOW);
-		    			
-		    			hoodToggle.input(joy.getRawButton(12));
-//	    				hood.set(hoodToggle.get());
     				}
 	    			else//manual
 	    			{
@@ -890,7 +943,7 @@ public class Robot extends IterativeRobot
     				}
     		}//end time switch
 		}//end importantdone
-    	lastPOV = POV;
+    	lastPOV = joyPOV;
     	lastJoy = joy.getRawButton(1);
     	lastJoy2 = joy.getRawButton(2);
     	

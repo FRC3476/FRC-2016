@@ -393,7 +393,6 @@ public class Drive implements Subsystem
 		driven.setOutputrange(new double[]{percentSpeed/100, -percentSpeed/100});
 		driven.setSetpoint(both.getDistance() + delta);
 		
-		
 		gyro.reset();
 		straightTurn.reset();
 		straightTurn.setSetpoint(0);
@@ -410,6 +409,11 @@ public class Drive implements Subsystem
 	{
 		driveManual.poke();
 		driveTrain.arcadeDrive(move, rotate);
+	}
+	
+	public void killDriveManual()
+	{
+		driveManual.kill();
 	}
 	
 	/**

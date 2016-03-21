@@ -48,4 +48,9 @@ public class ManualHandler
 		first = true;
 		lastManualTime = System.currentTimeMillis();
 	}
+	
+	public void kill()
+	{
+		lastManualTime = System.currentTimeMillis() - timeThreshold - 1;
+	}
 }
