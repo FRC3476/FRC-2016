@@ -157,14 +157,16 @@ public class Shooter implements Subsystem
 	@Override
 	public synchronized void doAuto(double[] params, String command)
 	{
+		resetState();
 		lastCommand = command;
-		System.out.println(command);
+		System.out.println(this + " " + command);
 		switch(command)
 		{
 			case "shooter":
 				setFly(params[1]);
 				break;
 			case "flywheel":
+				setFly(-1);
 				setFly(params[0]);
 				break;
 			case "fire":
@@ -178,6 +180,13 @@ public class Shooter implements Subsystem
 				startFire();
 				break;
 		}
+	}
+	
+	private synchronized void resetState()
+	{
+		flyDone = false;
+		loadDone = false;
+		fireDone = false;
 	}
 	
 	@Override
@@ -325,7 +334,8 @@ public class Shooter implements Subsystem
 					break;
 			}
 			
-			if(flywheelcontrol.onTarget() && Math.abs(flywheelcontrol.getError()) < FLYWHEELDEAD)
+			
+			if(Math.abs(flywheelcontrol.getError()) < FLYWHEELDEAD)
 			{
 				flyDone = true;
 			}
@@ -362,6 +372,7 @@ public class Shooter implements Subsystem
 					else
 					{
 						loadDone = true;
+						fireDone = true;
 					}
 					
 					//Reset state to avoid unpredictable behavior
@@ -453,6 +464,11 @@ public class Shooter implements Subsystem
 	public double getFlySet()
 	{
 		return flywheelcontrol.getSetpoint();
+	}
+	
+	public double getFlySpeed()
+	{
+		return tach.pidGet();
 	}
 	
 	public synchronized void stopFly()
@@ -590,9 +606,8 @@ public class Shooter implements Subsystem
 	
 	public synchronized void end()
 	{
-		flyDone = true;
-		//control.setSetpoint(0);
-		flywheelcontrol.setSetpoint(0);
+		resetState();
+		setFly(-1);
 		flywheelcontrol.disable();
 	}
 	

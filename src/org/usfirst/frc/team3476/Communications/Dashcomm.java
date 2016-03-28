@@ -20,7 +20,7 @@ public static final int NUMDATAPIECES = 3;
 	 */
 	public static double[][] getTargetData()
 	{
-		double[] rawData = getNumberArray(TARGETINGKEY, new double[]{Double.NaN, Double.NaN, Double.NaN});
+		double[] rawData = get(TARGETINGKEY, new double[]{Double.NaN, Double.NaN, Double.NaN});
 		//System.out.println("RawData: " + Arrays.toString(rawData));
 		if(rawData.length == 0)
 			return new double[][]{{Double.NaN, Double.NaN, Double.NaN}};
@@ -47,7 +47,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed double value, if available
 	 */
-	public static double getNumber(String keypath, double defaultvalue)
+	public static double get(String keypath, double defaultvalue)
 	{
 		return NetworkTable.getTable("").getNumber(keypath, defaultvalue);
 	}
@@ -58,7 +58,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed double[] value, if available
 	 */
-	public static double[] getNumberArray(String keypath, double[] defaultvalue)
+	public static double[] get(String keypath, double[] defaultvalue)
 	{
 		return NetworkTable.getTable("").getNumberArray(keypath, defaultvalue);
 	}
@@ -69,7 +69,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed boolean value, if available
 	 */
-	public static boolean getBoolean(String keypath, boolean defaultvalue)
+	public static boolean get(String keypath, boolean defaultvalue)
 	{
 		return NetworkTable.getTable("").getBoolean(keypath, defaultvalue);
 	}
@@ -80,7 +80,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed boolean[] value, if available
 	 */
-	public static boolean[] getBooleanArray(String keypath, boolean[] defaultvalue)
+	public static boolean[] get(String keypath, boolean[] defaultvalue)
 	{
 		return NetworkTable.getTable("").getBooleanArray(keypath, defaultvalue);
 	}
@@ -91,7 +91,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed String value, if available
 	 */
-	public static String getString(String keypath, String defaultvalue)
+	public static String get(String keypath, String defaultvalue)
 	{
 		return NetworkTable.getTable("").getString(keypath, defaultvalue);
 	}
@@ -102,7 +102,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed String[] value, if available
 	 */
-	public static String[] getStringArray(String keypath, String[] defaultvalue)
+	public static String[] get(String keypath, String[] defaultvalue)
 	{
 		return NetworkTable.getTable("").getStringArray(keypath, defaultvalue);
 	}
@@ -113,7 +113,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param defaultvalue the default value if no keyed value is available
 	 * @return the keyed Object[] value, if available
 	 */
-	public static Object getValue(String keypath, Object defaultvalue)
+	public static Object get(String keypath, Object defaultvalue)
 	{
 		return NetworkTable.getTable("").getValue(keypath, defaultvalue);
 	}
@@ -127,7 +127,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double value to put
 	 */
-	public static void putNumber(String keypath, double value)
+	public static void put(String keypath, double value)
 	{
 		NetworkTable.getTable("").putNumber(keypath, value);
 	}
@@ -137,7 +137,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the double[] value to put
 	 */
-	public static void putNumberArray(String keypath, double[] value)
+	public static void put(String keypath, double[] value)
 	{
 		NetworkTable.getTable("").putNumberArray(keypath, value);
 	}
@@ -147,7 +147,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the String value to put
 	 */
-	public static void putString(String keypath, String value)
+	public static void put(String keypath, String value)
 	{
 		NetworkTable.getTable("").putString(keypath, value);
 	}
@@ -157,7 +157,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the String[] value to put
 	 */
-	public static void putStringArray(String keypath, String[] value)
+	public static void put(String keypath, String[] value)
 	{
 		NetworkTable.getTable("").putStringArray(keypath, value);
 	}
@@ -167,7 +167,7 @@ public static final int NUMDATAPIECES = 3;
 	 * @param keypath the path to the value including the key - DO NOT PREPEND A '/'
 	 * @param value the boolean value to put
 	 */
-	public static void putBoolean(String keypath, boolean value)
+	public static void put(String keypath, boolean value)
 	{
 		NetworkTable.getTable("").putBoolean(keypath, value);
 	}

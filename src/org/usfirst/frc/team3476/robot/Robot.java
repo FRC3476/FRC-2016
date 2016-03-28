@@ -118,7 +118,7 @@ public class Robot extends IterativeRobot
     AnalogInput pressure = new AnalogInput(3), ballsensor = new AnalogInput(2);
     
     //AtoD loaderSwitch = new AtoD(ballsensor, 0.65, false);
-    OrangeDigital loaderSwitch = new OrangeDigitalInput(5);
+    OrangeDigitalInput loaderSwitch = new OrangeDigitalInput(4);
     
     DigitalInput banner = new DigitalInput(1);
     PIDCounterPeriodWrapper tach = new PIDCounterPeriodWrapper(banner, 60);
@@ -156,6 +156,9 @@ public class Robot extends IterativeRobot
 	private boolean posmove;
 	private double watchset;
 	private boolean rehome = false;
+	private boolean lastforward;
+	private boolean lastbackward;
+	private boolean lasthold;
     
     /**
      * This function is run when the robot is first started up and should be
@@ -172,6 +175,8 @@ public class Robot extends IterativeRobot
     	
     	leftDrive.setDistancePerPulse(0.05235987755982988730771072305464);
     	rightDrive.setDistancePerPulse(0.05235987755982988730771072305464);
+    	
+    	loaderSwitch.setInverted(false);
     	
     	intake1.setInverted(false);
     	intake2.setInverted(false);
@@ -201,6 +206,7 @@ public class Robot extends IterativeRobot
 		systems[2] = new Shooter(	flyTalon1, flyTalon2, loaderTalon, (Turret)systems[1], tach,
 									loaderSwitch, vision, hood);
 		systems[3] = new Intake(intake1, intake2, ddmotor, pdp);
+		systems[7] = new DashboardPoster(systems);
 		systems[8] = new Watcher(systems, 10);
 		systems[9] = new Clock(systems);
 		
@@ -254,8 +260,8 @@ public class Robot extends IterativeRobot
     		main.startThread();
     		first = false;
     		
-    		Dashcomm.putBoolean("match/enabled", true);
-    		
+    		Dashcomm.put("match/enabled", true);
+    		setMatchInfo(true);
     	}
     	
     	if(Timer.getMatchTime() > 15.0) main.stop();
@@ -281,7 +287,7 @@ public class Robot extends IterativeRobot
 				main.stop();
 				first = false;
 				
-				Dashcomm.putBoolean("match/enabled", false);
+				Dashcomm.put("match/enabled", false);
 				
 			}
 			if(camfirst && starter.cameraDone())
@@ -317,14 +323,14 @@ public class Robot extends IterativeRobot
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE
     	{
     		//intake pos constants
-    		final double up = 295, horiz = 4630, down = 5705;
+    		final double up = 295, horiz = 4630, down = 5705, drawbridge = 3000;
     		
-    		final double FLYWHEELMAX = 9100;
+    		final double FLYWHEELMAX = 15500;
     		
-    		final double CLOSESPEED = 6750, FARSPEED = 6750;
+    		final double CLOSESPEED = 6750, FARSPEED = 8000;
     		
     		//prints
-    		boolean axisprint = false,  tachprint = false, currentprint = true,
+    		boolean axisprint = false,  tachprint = false, currentprint = false,
     				pressureprint = false, driveencoderprint = false, spigyroprint = false,
     				intakeenc = false, shooterout = false, ballsensorprint = false,
     				distanceprint = false, shootervdist = false, povprint = false,
@@ -388,7 +394,7 @@ public class Robot extends IterativeRobot
 						turret.killHomer();
 					}
 					
-					Dashcomm.putBoolean("match/enabled", true);
+					Dashcomm.put("match/enabled", true);
 					
 					
 	    		default://!first - Normal execution
@@ -397,23 +403,40 @@ public class Robot extends IterativeRobot
 	    				//===========
 	    				//===Drive===
 	    				//===========
-	    				boolean forward = xboxPOV == 0, backward = xboxPOV == 180;
+	    				boolean forward = xboxPOV == 0, backward = xboxPOV == 180, hold = xboxbuttons[3];//3 = x - hold
 	    				if(forward || backward)//Ramparts crossing
 	    				{
-	    					if(forward)
+	    					if(!(lastforward || lastbackward))
 	    					{
-	    						drive.executeSimpleDrive(300, 70);
+	    						if(forward)
+		    					{
+		    						drive.doAuto(new double[]{300, 70}, "driven");
+		    					}
+		    					else
+		    					{
+		    						drive.doAuto(new double[]{-300, 70}, "driven");
+		    					}
+	    						drive.killDriveManual();
 	    					}
-	    					else
-	    					{
-	    						drive.executeSimpleDrive(-300, 70);
-	    					}
-	    					drive.killDriveManual();
+	    				}
+	    				else if(hold)
+	    				{
+	    					if(!lasthold)
+    						{
+	    						drive.doAuto(new double[]{0, 0}, "hold");
+    						}
 	    				}
 	    				else//regular drive
 	    				{
+	    					if(lastforward || lastbackward || lasthold)
+	    					{
+	    						drive.killAuto();
+	    					}
 	    					drive.augmentedDrive(yAxis, xAxis);
 	    				}
+	    				lastforward = forward;
+	    				lastbackward = backward;
+	    				lasthold = hold;
 	    				
 	    				
 	    				//=================
@@ -685,17 +708,21 @@ public class Robot extends IterativeRobot
 	    						{
 	    							intake.home();
 	    						}
-	    						if(joy.getRawButton(7))
+	    						if(joybuttons[7])
 			    				{
 			    					intake.moveDropdown(up);
 			    				}
-			    				else if(joy.getRawButton(9))
+			    				else if(joybuttons[9])
 			    				{
 			    					intake.moveDropdown(horiz);
 			    				}
-			    				else if(joy.getRawButton(11))
+			    				else if(joybuttons[11])
 			    				{
 			    					intake.moveDropdown(down);
+			    				}
+			    				else if(xboxbuttons[5])
+			    				{
+			    					intake.moveDropdown(drawbridge);
 			    				}
 	    					}
 	    				}
@@ -713,7 +740,7 @@ public class Robot extends IterativeRobot
 	    				{
 	    					wheelie.set(true);
 	    				}
-	    				else if(xboxbuttons[3])//x - retract
+	    				else if(xboxbuttons[4])//y - retract
 	    				{
 	    					wheelie.set(false);
 	    				}
@@ -843,9 +870,6 @@ public class Robot extends IterativeRobot
 	    				//System.out.println("Banner: " + banner.get());
 	    			}
 	    			
-	    			Dashcomm.putNumber("data/flywheel/tachometer", 60/tach.getPeriod());
-	    			Dashcomm.putNumber("data/flywheel/setpoint", shooter.getFlySet());
-	    			
 	    			if(loaderstateprint)
 	    			{
 	    				System.out.println("Loader State: " + shooter.getLoaderState());
@@ -878,7 +902,7 @@ public class Robot extends IterativeRobot
 	    			
 	    			if(ballsensorprint)
 	    			{
-	    				System.out.println("Voltage: " + ballsensor.getVoltage() + ", AtoD Value: " + loaderSwitch.get());
+	    				System.out.println("Digital Value: " + loaderSwitch.get());
 	    			}
 	    			
 	    			if(currentprint)
@@ -928,7 +952,10 @@ public class Robot extends IterativeRobot
     				
     				if(tachprint)
     				{
-		        		if(iters % 10 == 0) System.out.println("Tach: " + (60/tach.getPeriod()));
+		        		if(iters % 10 == 0)
+	        			{
+		        			System.out.println("Tach: " + (60/tach.getPeriod()) + "\nSet:  " + shooter.getFlySet() + "\n");
+	        			}
     				}
     				
     				if(pressureprint)
@@ -942,6 +969,7 @@ public class Robot extends IterativeRobot
     					System.out.println("Right: " + rightDrive.getDistance());
     				}
     		}//end time switch
+    		setMatchInfo(false);
 		}//end importantdone
     	lastPOV = joyPOV;
     	lastJoy = joy.getRawButton(1);
@@ -956,7 +984,6 @@ public class Robot extends IterativeRobot
 		{
 			lastxboxbuttons[i] = xboxbuttons[i];
 		}
-		
     	iters++;
     }
     
@@ -967,6 +994,11 @@ public class Robot extends IterativeRobot
     
     public void setCameramode(CameraMode mode)
     {
-    	Dashcomm.putBoolean("data/visioncam", mode == CameraMode.VISION);
+    	Dashcomm.put("data/visioncam", mode == CameraMode.VISION);
+    }
+    
+    public void setMatchInfo(boolean auto)
+    {
+    	Dashcomm.put("match/auto?", auto);
     }
 }

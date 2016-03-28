@@ -1,5 +1,9 @@
 package org.usfirst.frc.team3476.Subsystems;
 
+import java.text.Format;
+import java.util.Formatter;
+
+import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Subsystems.Shooter.LoaderState;
 import org.usfirst.frc.team3476.Utility.DIOHomer;
@@ -25,7 +29,7 @@ import edu.wpi.first.wpilibj.Timer;
 
 public class Turret implements Subsystem
 {
-	enum AimMode{VISION, ENCODER}
+	enum AimMode{VISION, ENCODER, SEARCH}
 	
 	private final String[] autoCommands = {"visionaim", "encoderaim", "search", "searchleft", "searchright", "waitforhome"};
 	
@@ -33,12 +37,13 @@ public class Turret implements Subsystem
 										"TURRETENCODERDEAD", "SOFTLIMITS", "USESOFT", "HOMINGDIR",
 										"HOMEHIGH", "HOMESEEKSPEED", "HOMESLOWSPEED", "HOMETIMEOUT",
 										"RESETSPEED", "RESETDEAD", "TURRETOUTPUTRANGE", "TURRETDONUT",
-										"TURRETCLAMP", "VISIONTHROWAWAY", "VISIONAVERAGEQTY", "FINEERRORTHRESHOLD"};
+										"TURRETCLAMP", "VISIONTHROWAWAY", "VISIONAVERAGEQTY", "FINEERRORTHRESHOLD",
+										"FINECLAMP", "SEEKCLAMP", "SEARCHCLAMP", "VISIONSCALE"};
 	
 	private double 	TURRETENCODERP, TURRETENCODERI, TURRETENCODERD, TURRETENCODERDEAD, SOFTLIMITS,
 					USESOFT, HOMINGDIR, HOMEHIGH, HOMESEEKSPEED, HOMESLOWSPEED, HOMETIMEOUT, RESETSPEED,
 					RESETDEAD, TURRETOUTPUTRANGE, TURRETDONUT, TURRETCLAMP, VISIONTHROWAWAY, VISIONAVERAGEQTY,
-					FINEERRORTHRESHOLD;
+					FINEERRORTHRESHOLD, FINECLAMP, SEEKCLAMP, SEARCHCLAMP, VISIONSCALE;
 	
 	private int iters, softDir;
 	private boolean softlimitsPassed, resettingSoft, turretdone;
@@ -86,6 +91,10 @@ public class Turret implements Subsystem
 	private boolean setpointDiff;
 
 	private boolean encoderdone;
+
+	private int notfinishedcount;
+
+	private boolean notfinishedoverride;
 
 	public Turret(DonutCANTalon turretin, DigitalInput halleffectin, PIDDashdataWrapper visionin)
 	{
@@ -142,6 +151,7 @@ public class Turret implements Subsystem
 	@Override
 	public synchronized void doAuto(double[] params, String command)
 	{
+		resetState();
 		System.out.println(this + " " + command);
 		switch(command)
 		{
@@ -165,19 +175,36 @@ public class Turret implements Subsystem
 				break;
 		}
 	}
+	
+	private synchronized void resetState()
+	{
+		waitingforhome = false;
+		searching = false;
+		turretdone = false;
+		turretautodone = false;
+		encoderdone = false;
+		resettingSoft = false;
+		softFlag = false;
+		notfinishedcount = 0;
+		notfinishedoverride = false;
+	}
 
 	@Override
 	public synchronized boolean isAutoDone()
 	{
 		if(waitingforhome)
 		{
-			if(!(turretHomer != null && turretHomer.isStopped()))
+			if(turretHomer != null && turretHomer.isStopped())
 			{
 				waitingforhome = false;
 				return true;
 			}
+			else
+			{
+				return false;
+			}
 		}
-		return turretdone;
+		return turretautodone;
 	}
 
 	@Override
@@ -236,6 +263,16 @@ public class Turret implements Subsystem
 		VISIONTHROWAWAY = constantsin[i];
 		i++;//17
 		VISIONAVERAGEQTY = constantsin[i];
+		i++;//18
+		FINEERRORTHRESHOLD = constantsin[i];
+		i++;//19
+		FINECLAMP = constantsin[i];
+		i++;//20
+		SEEKCLAMP = constantsin[i];
+		i++;//21
+		SEARCHCLAMP = constantsin[i];
+		i++;//22
+		VISIONSCALE = constantsin[i];
 		
 		//System.out.println("Shooter constants: " + Arrays.toString(constantsin));
 		
@@ -336,11 +373,26 @@ public class Turret implements Subsystem
 				
 				if(!turretdone)
 				{
-					boolean searchdone = searching && vision.targetAvailable();
+					boolean searchdone = false;
 					if(searching)//slow down for searching
 					{
-						//halve the range above the donut - essentially scaling
-						turret.setClamp((TURRETCLAMP-TURRETDONUT)*0.5 + TURRETDONUT);
+						turret.setClamp(SEARCHCLAMP);
+						if(vision.targetAvailable())
+						{
+							searchdone = true;
+						}
+						else if(encoderdone)//we are here, so start discarding frames
+						{
+							visionthrowawaycount++;
+							if(visionthrowawaycount >= 3)//too many frames thrown away, no target here
+							{
+								searchdone = true;//done, but not sucessful
+							}
+						}
+						else//if we aren't at the setpoint, don't discard images yet
+						{
+							visionthrowawaycount = 0;
+						}
 					}
 					switch(aimmode)
 					{
@@ -362,37 +414,50 @@ public class Turret implements Subsystem
 									{
 										case SEEK:
 											System.out.println("SEEK");
-											turret.setClamp(TURRETCLAMP);
+											Dashcomm.put("data/visiondone", false);
+											turret.setClamp(SEEKCLAMP);
 											if(visionval < FINEERRORTHRESHOLD)//error small enough, fine control
 											{
 												visionMode = VisionMode.DISCARD;
-												//halve the range above the donut - essentially scaling
-												turret.setClamp((TURRETCLAMP-TURRETDONUT)*0.5 + TURRETDONUT);
+												notfinishedoverride = false;
+												turret.setClamp(FINECLAMP);
+												//System.out.println("DISCARD");
 											}
 											else
 											{
 												rectifyangle = visionSet(visionval, enc);//set the turret in motion
+												System.out.println("rectifyangle: " + rectifyangle);
 												break;
 											}
 											
 										case DISCARD://discard a couple frames so that the move can complete
-											System.out.println("DISCARD");
 											if(visionval >= FINEERRORTHRESHOLD)//error too large, seek control
 											{
+												System.out.println("visionval: " + visionval);
 												visionMode = VisionMode.SEEK;
 												break;
 											}
 											
-											if(encoderdone)//we are here, so start discarding frames
+											if(encoderdone || notfinishedoverride)//we are here, so start discarding frames
 											{
+												notfinishedcount = 0;
 												visionthrowawaycount++;
 												if(visionthrowawaycount >= VISIONTHROWAWAY)//if we have thrown away enough frames...
 												{
 													visionMode = VisionMode.AVERAGE;//...start averaging again
 												}
 											}
-											else//we are in fine mode, so if we aren't at the setpoint, don't discard images
+											else//we are in fine mode, so if we aren't at the setpoint, don't discard images yet
 											{
+												notfinishedcount++;
+												if(notfinishedcount >= 10)
+												{
+													notfinishedoverride = true;
+													System.out.println("NOTFINISHED: " + notfinishedcount +
+															"\nError: " + turretencodercontrol.getError() +
+															", Dead: " + TURRETENCODERDEAD +
+															"\nPower: " + turretencodercontrol.get() + "\n\n\n\n\n\n");
+												}
 												visionthrowawaycount = 0;
 											}
 											break;
@@ -402,7 +467,6 @@ public class Turret implements Subsystem
 											{
 												visionMode = VisionMode.SEEK;
 											}
-											
 											
 											if(!visionavg.isFull())
 											{
@@ -414,17 +478,21 @@ public class Turret implements Subsystem
 											}
 											
 										case FINEGO://move to the averaged value
-											System.out.println("GO");
-											double avgval = visionavg.getAverage();
+											//System.out.println("GO");
+											double avgval = visionavg.getAverage()*VISIONSCALE;
 											visionavg.reset();
-											System.out.println("avgval: " + avgval);
+											//System.out.println("avgval: " + avgval);
 											//recalc angle, new vision value (vision error may or may not be in tolerance)
-											System.out.println("Vision: " + visionval + " error: " + turretencodercontrol.getError());
-											if(avgval != lastsetvision)//if this value has not been previously set, set it
+											//System.out.println("Vision: " + visionval + " error: " + turretencodercontrol.getError());
+											if(avgval != lastsetvision || true)//if this value has not been previously set, set it
 											{
-												if(Math.abs(avgval + turretencodercontrol.getError()) < TURRETENCODERDEAD)
+												//System.out.printf("Vision:  %.5f\nEncoder: %.5f\n", enc + rectifyAngle(avgval + enc, enc), enc);
+												if(Math.abs(avgval) < TURRETENCODERDEAD)
 												{
-													System.out.println("VISIONDONE");
+													if(!turretautodone)
+													{
+														System.out.println("VISION DONE");
+													}
 													visiondone = true;
 												}
 												else
@@ -432,8 +500,12 @@ public class Turret implements Subsystem
 													rectifyangle = visionSet(avgval, enc);//set the turret in motion
 												}
 											}
+											Dashcomm.put("data/visiondone", visiondone);
 											visionMode = VisionMode.DISCARD;//next...
+											notfinishedoverride = false;
+											notfinishedcount = 0;
 											visionthrowawaycount = 0;
+											//System.out.println("DISCARD");
 											break;
 									}
 									lastvision = visionval;
@@ -466,7 +538,12 @@ public class Turret implements Subsystem
 							
 							timereport += "visionchk: " + (System.nanoTime() - startTime) + "\n";
 							
+						case SEARCH:
 						case ENCODER:
+							if(aimmode == AimMode.ENCODER)
+							{
+								turret.setClamp(TURRETCLAMP);
+							}
 							//If first exec, make sure we're using the right control
 							//System.out.println("Lastturretdone: " + lastturretdone);
 							if(!searchdone)
@@ -495,7 +572,7 @@ public class Turret implements Subsystem
 									print += "360 noscope: " + rectifyangle + "\n";
 									turretencodercontrol.reset();//disables as well
 									resetBang.setSetpoint(rectifyangle);
-									turret.setClamp(1);
+									turret.setClamp(0.75);
 									turretencodercontrol.setSetpoint(rectifyangle);
 									softFlag = false;
 								}
@@ -525,7 +602,10 @@ public class Turret implements Subsystem
 							if(!print.equals(""))
 								System.out.print(print);
 							
-							if(searching) System.out.println("Searchdone: " + searchdone);
+							/*if(searching)
+							{
+								System.out.println("Searchdone: " + searchdone + "\nMode: " + aimmode);
+							}*/
 							encoderdone = Math.abs(turretencodercontrol.getError()) < TURRETENCODERDEAD;
 							/*if(iters % 50 == 0)
 							{
@@ -539,29 +619,53 @@ public class Turret implements Subsystem
 								}
 								
 							}*/
-							if((turretencodercontrol.onTarget() && encoderdone)  || searchdone || visiondone)
+							if((turretencodercontrol.onTarget() && encoderdone) || searchdone || visiondone)
 							{
 								//System.out.println("onTarget: " + turretencodercontrol.getError());
 //								System.out.println("onTarget error: " + turretencodercontrol.getAvgError() +
 //										", error: " + turretencodercontrol.getError());
-								turret.setClamp(TURRETCLAMP);
-								if(aimmode == AimMode.ENCODER) turretdone = true;
+								
+								if(aimmode == AimMode.ENCODER)
+								{
+									turretdone = true;
+									turretautodone = true;
+									turretencodercontrol.disable();
+								}
 
 								if(aimmode == AimMode.VISION && visiondone)
 								{
-									turretdone = true;
-									System.out.println("VISION DONE");
+									if(!turretautodone)
+									{
+										System.out.println("FINAL VISION DONE");
+									}
+									visiondone = false;
+									turretautodone = true;
+									turretencodercontrol.disable();
 								}
-								visiondone = false;
+								
+								if(aimmode != AimMode.VISION)
+								{
+									visiondone = false;//reset state
+								}
+								
+								if(aimmode == AimMode.SEARCH && searchdone)
+								{
+									turretautodone = true;
+									searchdone = false;
+									searching = false;
+									turretdone = true;
+									visionthrowawaycount = 0;
+									turretencodercontrol.setSetpoint(encoder.getDistance());
+									turretencodercontrol.disable();
+									System.out.println("SEARCH DONE");
+								}
+								
 								resettingSoft = false;
 								softFlag = false;
-								searching = false;
-								turretencodercontrol.disable();
 							}
 							timereport += "targetchk: " + (System.nanoTime() - startTime) + "\n";
 							break;
 					}
-					turretautodone = turretdone;
 				}
 				else
 				{
@@ -703,7 +807,8 @@ public class Turret implements Subsystem
 	public synchronized void search(double angle)
 	{
 		searching = true;
-		aim(encoder.getDistance() + angle);
+		aimmode = AimMode.SEARCH;
+		encodermove(encoder.getDistance() + angle);
 	}
 	
 	/**
@@ -723,8 +828,13 @@ public class Turret implements Subsystem
 	public synchronized void aim(double angle)
 	{
 		turretdone = false;
-		aimangle = angle;
 		aimmode = AimMode.ENCODER;
+		encodermove(angle);
+	}
+	
+	private synchronized void encodermove(double angle)
+	{
+		aimangle = angle;
 	}
 	
 	/**
@@ -917,9 +1027,7 @@ public class Turret implements Subsystem
 	
 	public synchronized void end()
 	{
-		turretdone = true;
-		resettingSoft = false;
-		softFlag = false;
+		resetState();
 		turretencodercontrol.disable();
 	}
 	

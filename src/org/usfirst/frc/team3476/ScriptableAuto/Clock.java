@@ -32,6 +32,7 @@ public class Clock implements Subsystem
 	@Override
 	public synchronized void doAuto(double[] params, String command)
 	{
+		System.out.println(this + ": " + command);
 		done = false;
 		if(command.equalsIgnoreCase("wait"))
 		{

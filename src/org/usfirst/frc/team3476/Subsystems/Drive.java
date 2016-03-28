@@ -23,7 +23,7 @@ import edu.wpi.first.wpilibj.interfaces.Gyro;
 
 public class Drive implements Subsystem
 {
-	private final String[] autoCommands = {"turn", "drive", "driven", "shiftit", "clear"};
+	private final String[] autoCommands = {"turn", "drive", "driven", "shiftit", "clear", "hold"};
 	private final String[] constants = {"DRIVEDEAD", "DRIVESTRAIGHTDEAD", "TURNDEAD", "USELEFT",
 										"USERIGHT", "STRAIGHTP", "STRAIGHTI", "STRAIGHTD", "DRIVEP",
 										"DRIVEI", "DRIVED", "TURNP", "TURNI", "TURND", "SHIFTINGSPEED",
@@ -64,6 +64,7 @@ public class Drive implements Subsystem
 	Timer doneTimer;
 	Timer mainTimer;
 	private boolean autoDone;
+	private boolean holdoverride;
 	
 	public Drive(MedianEncoder leftin, MedianEncoder rightin, Gyro gyroin, DonutDrive driveTrainin,
 			Solenoid shiftersin)
@@ -129,14 +130,11 @@ public class Drive implements Subsystem
 	@Override
 	public synchronized void doAuto(double[] params, String command)
 	{
-		autoShifting = false;
-		done = false;
-		autoDone = false;
-		clear = false;
-		mainTimer.reset();
-		mainTimer.start();
-		doneTimer.reset();
-		doneTimer.start();
+		if(!command.equals("clear"))
+		{
+			System.out.println(this + " " + command);
+		}
+		resetState();
 		switch(command)
 		{
 			case "turn":
@@ -152,11 +150,28 @@ public class Drive implements Subsystem
 				setShifterState(params[0] == 1 ? ShiftingState.HIGH : ShiftingState.LOW);
 				done = true;
 				break;
+			case "hold":
+				executeDrive(0);
+				holdoverride = true;
+				break;
 			case "clear":
 				clear = true;
 				done = true;
 				break;
 		}
+	}
+	
+	private synchronized void resetState()
+	{
+		autoShifting = false;
+		done = false;
+		autoDone = false;
+		holdoverride = false;
+		clear = false;
+		mainTimer.reset();
+		mainTimer.start();
+		doneTimer.reset();
+		doneTimer.start();
 	}
 
 	@Override
@@ -277,9 +292,9 @@ public class Drive implements Subsystem
 						
 						//Check if we're done here 
 						//TODO: Decide if the drive needs to be in the deadzone for multiple iterations
-						boolean driveDone = Math.abs(drive.getSetpoint() - encoderAvg.pidGet()) < DRIVEDEAD;
-						boolean drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD;
-						boolean turnDone = Math.abs(turn.getError()) < TURNDEAD;
+						boolean driveDone = Math.abs(drive.getError()) < DRIVEDEAD, 
+								drivenDone = Math.abs(driven.getSetpoint() - both.getDistance()) < DRIVEDEAD,
+								turnDone = Math.abs(turn.getError()) < TURNDEAD;
 						//System.out.println("Turn PID output: " + turn.get() + " error: " + (turn.getError()));
 						if(!(driveStraight ? (simple ? drivenDone : driveDone) : turnDone))
 						{
@@ -289,6 +304,7 @@ public class Drive implements Subsystem
 						{
 							done = true;
 						}
+						if(holdoverride) done = false;
 						autoDone = done;
 					}
 					else
@@ -414,6 +430,15 @@ public class Drive implements Subsystem
 	public void killDriveManual()
 	{
 		driveManual.kill();
+	}
+	
+	public void killAuto()
+	{
+		autoShifting = true;
+		done = true;
+		autoDone = true;
+		clear = true;
+		holdoverride = false;
 	}
 	
 	/**

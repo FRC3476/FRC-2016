@@ -89,7 +89,7 @@ public class Main
 			if(stop)break;
 			done = false;
 			curCommands = par.nextLine();
-			Dashcomm.putString("command", "" + curCommands);
+			Dashcomm.put("command", "" + curCommands);
 			while (!done)//Keep going until line is done (ArrayList is empty)
 			{
 				if(stop)break;
@@ -126,7 +126,7 @@ public class Main
 	 */
 	private String getScript()
 	{
-		return Dashcomm.getString("auto/java auto text", "no auto text");
+		return Dashcomm.get("auto/java auto text", "no auto text");
 	}
 	
 	/**
@@ -135,7 +135,7 @@ public class Main
 	 */
 	private String getConstants()
 	{
-		return Dashcomm.getString("auto/java constants", "no constants");
+		return Dashcomm.get("auto/java constants", "no constants");
 	}
 	
 	/**
@@ -214,7 +214,7 @@ public class Main
 	 */
 	public void sendCheckText()
 	{
-		Dashcomm.putString("auto/java check text", par.getScript());
+		Dashcomm.put("auto/java check text", par.getScript());
 	}
 	
 	/**

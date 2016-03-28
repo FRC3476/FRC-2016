@@ -47,10 +47,10 @@ public class PIDDashdataWrapper implements PIDSource
 	
 	public boolean checkFrameDouble()
 	{
-		boolean newframe = Dashcomm.getBoolean("data/newframe", false);
+		boolean newframe = Dashcomm.get("data/newframe", false);
 		if(newframe)
 		{
-			Dashcomm.putBoolean("data/newframe", false);
+			Dashcomm.put("data/newframe", false);
 			return true;
 		}
 		return false;
@@ -58,7 +58,7 @@ public class PIDDashdataWrapper implements PIDSource
 	
 	public boolean checkFrame()
 	{
-		boolean newframe = Dashcomm.getBoolean("data/newframe", false);
+		boolean newframe = Dashcomm.get("data/newframe", false);
 		if(newframe)
 		{
 			return true;
