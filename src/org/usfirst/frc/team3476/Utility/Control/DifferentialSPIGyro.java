@@ -5,7 +5,7 @@ import java.util.Arrays;
 import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import edu.wpi.first.wpilibj.SPI;
 
-public class DifferentialSPIGyro extends ADXRS450_Gyro
+public class DifferentialSPIGyro extends ADXRS450_Gyro implements DifferentialGyro
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;

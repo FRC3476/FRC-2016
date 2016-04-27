@@ -41,7 +41,7 @@ import edu.wpi.first.wpilibj.hal.DIOJNI;
  */
 public class Shooter implements Subsystem
 {
-	private final String[] autoCommands = {"shooter", "flywheel", "fire", "reload", "directfire"};
+	private final String[] autoCommands = {"shooter", "flywheel", "fire", "reload", "stopreload", "startreload", "directfire", "flyoff"};
 	private final String[] constants = {"SHOOTEROUTPUTRANGEHIGH", "SHOOTEROUTPUTRANGELOW", "SHOOTERIGAIN",
 			"FLY1DIR", "FLY2DIR", "FLYWHEELDEAD", "FLYWHEELMAXSPEED", "LOADERSPEED",
 			"SHOOTERPGAIN", "SHOOTERDGAIN", "LOADERSPEEDLOW", "FIRINGTIME"};
@@ -96,6 +96,8 @@ public class Shooter implements Subsystem
 	private LoaderState prevstate;
 	private boolean fireDone;
 	private double lastsetvision;
+	private boolean flyoffoverride;
+	private double olderror;
 	
 	public Shooter(	SpeedController fly1in, SpeedController fly2in, SpeedController loaderin,
 					Turret turretin, PIDCounterPeriodWrapper tachin, OrangeDigital loaderSwitch,
@@ -175,9 +177,23 @@ public class Shooter implements Subsystem
 			case "reload":
 				reload();
 				break;
+			case "startreload":
+				reload();
+				loadDone = true;
+				break;
+			case "stopreload":
+				prevstate = loaderState;//remember state
+				loaderState = LoaderState.WAITING;
+				break;
 			case "directfire":
 				setLoaded();
 				startFire();
+				break;
+			case "flyoff":
+				setFly(-1);
+				setFly(0);
+				flyoffoverride = true;
+				flyDone = true;
 				break;
 		}
 	}
@@ -187,6 +203,7 @@ public class Shooter implements Subsystem
 		flyDone = false;
 		loadDone = false;
 		fireDone = false;
+		flyoffoverride = false;
 	}
 	
 	@Override
@@ -207,6 +224,18 @@ public class Shooter implements Subsystem
 			default:
 				return true;
 		}*/
+		if(lastCommand.equals("startreload"))
+		{
+			System.out.println("" + fireDone + flyDone + loadDone);
+		}
+		if(lastCommand.equals("flywheel") && flyDone)
+		{
+			System.out.println("FLYDONE");
+			if(!(fireDone && loadDone))
+			{
+				System.out.println("" + fireDone + loadDone);
+			}
+		}
 		return fireDone && flyDone && loadDone;
 	}
 	
@@ -290,19 +319,29 @@ public class Shooter implements Subsystem
 	@Override
 	public synchronized void update()//Flywheel and turret control loop
 	{
+		if(flywheelcontrol.getSetpoint() > 0)
+		{
+			boolean ratiobad = Math.abs(flywheelcontrol.getError()/flywheelcontrol.getSetpoint()) > 0.8,
+					dirbad = (flywheelcontrol.getError() - olderror)*(flywheelcontrol.getError() - flywheelcontrol.getSetpoint()) < 0;
+			if(ratiobad && dirbad)
+			{
+				System.out.println("ERROR FLYWHEEL:\nSetpoint: " + flywheelcontrol.getSetpoint() + "\nPower: "
+									+ flywheelcontrol.get() + "\nError: " + flywheelcontrol.getError());
+			}
+		}
 		//=====================
 		//=======Shooter=======
 		//=====================
 		if(shooterManual.isTimeUp())
 		{
-			if(!flywheelcontrol.isEnabled())
-			{
-				flywheelcontrol.enable();
-			}
-			
 			switch(flyState)
 			{
 				case DISTANCE:
+					if(!flywheelcontrol.isEnabled())
+					{
+						flywheelcontrol.enable();
+					}
+					
 					if(vision.targetAvailable())
 					{
 						double visionval = distToFly.calc(vision.getClosestDist());
@@ -323,11 +362,31 @@ public class Shooter implements Subsystem
 						flywheelcontrol.disable();
 						break;
 					}
-					
+					break;
 					
 				case SETPOINT:
+					if(flyset != 0 && !flywheelcontrol.isEnabled())
+					{
+						flywheelcontrol.enable();
+					}
+					
 					if(flyset != lastflyset)//new value
 					{
+						if(flyset == 0)
+						{
+							if(flywheelcontrol.isEnabled())
+							{
+								flywheelcontrol.disable();
+							}
+							System.out.println("FLYSET ZERO");
+						}
+						else//not zero
+						{
+							if(!flywheelcontrol.isEnabled())
+							{
+								flywheelcontrol.enable();
+							}
+						}
 						flywheelcontrol.setSetpoint(flyset);
 					}
 					//if(iters % 15 == 0) System.out.println(OrangeUtility.PIDData(flywheelcontrol));
@@ -335,9 +394,9 @@ public class Shooter implements Subsystem
 			}
 			
 			
-			if(Math.abs(flywheelcontrol.getError()) < FLYWHEELDEAD)
+			if(!flyoffoverride)
 			{
-				flyDone = true;
+				flyDone = Math.abs(flywheelcontrol.getError()) < FLYWHEELDEAD;
 			}
 			
 			lastflyset = flyset;
@@ -391,6 +450,10 @@ public class Shooter implements Subsystem
 					{
 						loaderState = LoaderState.RELOADINGSLOW;
 					}
+					else
+					{
+						fireDone = true;
+					}
 					
 					//Reset state to avoid unpredictable behavior
 					toReload = false;
@@ -411,6 +474,10 @@ public class Shooter implements Subsystem
 						loaderState = LoaderState.LOADED;
 						loadDone = true;
 					}
+					else
+					{
+						fireDone = true;
+					}
 					
 					//Reset state to avoid unpredictable behavior
 					toReload = false;
@@ -423,17 +490,22 @@ public class Shooter implements Subsystem
 					
 					if(toFire)
 					{
+						System.out.println("FIRE");
 						prevstate = LoaderState.RELOADINGFAST;//reset state
 						loaderState = LoaderState.FIRING;
 						shootingTimer.reset();
 						shootingTimer.start();
+					}
+					else
+					{
+						fireDone = true;
 					}
 					
 					//Reset state to avoid unpredictable behavior
 					toReload = false;
 					break;
 					
-				case FIRING:
+				case FIRING://fireDone false only here
 					loader.set(LOADERSPEED);
 					if(shootingTimer.get() > FIRINGTIME)//done firing
 					{
@@ -454,6 +526,7 @@ public class Shooter implements Subsystem
 		iters++;
 		lastballsw = ballsw;
 		lastintakeRunning = intakeRunning;
+		olderror = flywheelcontrol.getError();
 	}
 	
 	public synchronized double getIntakeScaling()
@@ -469,6 +542,16 @@ public class Shooter implements Subsystem
 	public double getFlySpeed()
 	{
 		return tach.pidGet();
+	}
+	
+	public PIDController getShooterPID()
+	{
+		return flywheelcontrol;
+	}
+	
+	public PIDMotorGroup getMotorGroup()
+	{
+		return flygroup;
 	}
 	
 	public synchronized void stopFly()
@@ -536,6 +619,14 @@ public class Shooter implements Subsystem
 		fireDone = false;
 	}
 	
+	public synchronized void safeFire()
+	{
+		if(flyDone)
+		{
+			startFire();
+		}
+	}
+	
 	/**
 	 * Resets the loader state to WAITING in case of bad things.
 	 */
@@ -549,6 +640,11 @@ public class Shooter implements Subsystem
 	public synchronized boolean isFiring()
 	{
 		return loaderState == LoaderState.FIRING;
+	}
+	
+	public synchronized boolean isLoaded()
+	{
+		return loaderState == LoaderState.LOADED;
 	}
 	
 	/**
@@ -607,6 +703,7 @@ public class Shooter implements Subsystem
 	public synchronized void end()
 	{
 		resetState();
+		loaderState = loaderState == LoaderState.LOADED ? LoaderState.LOADED : LoaderState.WAITING;
 		setFly(-1);
 		flywheelcontrol.disable();
 	}

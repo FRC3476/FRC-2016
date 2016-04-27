@@ -129,6 +129,21 @@ public class Main
 		return Dashcomm.get("auto/java auto text", "no auto text");
 	}
 	
+	private String[] getScripts()
+	{
+		return Dashcomm.get("auto/script/scripts", new String[]{"no scripts"});
+	}
+	
+	private String[] getScriptNames()
+	{
+		return Dashcomm.get("auto/script/script names", new String[]{"no script names"});
+	}
+	
+	private String getSelected()
+	{
+		return Dashcomm.get("auto/script/selected", "no selection");
+	}
+	
 	/**
 	 * Returns the constants files String.
 	 * @return the String representation of the constants files
@@ -214,7 +229,7 @@ public class Main
 	 */
 	public void sendCheckText()
 	{
-		Dashcomm.put("auto/java check text", par.getScript());
+		Dashcomm.put("auto/java check text", par.getSelectedScript());
 	}
 	
 	/**
@@ -294,7 +309,7 @@ public class Main
 	 */
 	public void updateData()
 	{
-		par.update(getScript(), getConstants());
+		par.update(getScripts(), getScriptNames(), getSelected(), getConstants());
 		passConstants();
 		sendCheckText();
 	}

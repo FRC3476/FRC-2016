@@ -7,7 +7,7 @@ import edu.wpi.first.wpilibj.AnalogInput;
 import edu.wpi.first.wpilibj.PIDSource;
 import edu.wpi.first.wpilibj.interfaces.Gyro;
 
-public class DifferentialAnalogGyro extends AnalogGyro
+public class DifferentialAnalogGyro extends AnalogGyro implements DifferentialGyro
 {
 	public final int DEFSAMPLES = 5;
 	private int samples;

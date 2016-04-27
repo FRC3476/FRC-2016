@@ -51,7 +51,15 @@ public class DashboardPoster implements Subsystem
 		Shooter shooter = (Shooter)systems[2];
 		Dashcomm.put("data/flywheel/tachometer", shooter.getFlySpeed());
 		Dashcomm.put("data/flywheel/setpoint", shooter.getFlySet());
+		Dashcomm.put("data/loader/loaded", shooter.isLoaded());
 		Dashcomm.put("match/time", Timer.getMatchTime());
+		Drive drive = (Drive)systems[0];
+		Dashcomm.put("data/encoders/left", drive.getEncoders()[0].getDistance());
+		Dashcomm.put("data/encoders/right", drive.getEncoders()[1].getDistance());
+		Dashcomm.put("data/encoders/average", drive.getEncoderPair().getDistance());
+		Miscellaneous misc = (Miscellaneous)systems[4];
+		Dashcomm.put("data/misc/pressure", misc.getPressure());
+		Dashcomm.put("data/misc/fired", misc.isFired());
 	}
 
 	@Override

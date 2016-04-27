@@ -2,6 +2,8 @@ package org.usfirst.frc.team3476.ScriptableAuto;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,22 +19,43 @@ public class Parser
 	final String BACKUPCONSTANTS = "//Driving deadzones\nDRIVEDEAD = 2\nDRIVESTRAIGHTDEAD = 5\nTURNDEAD = 5\n\n//encoders\nUSELEFT = 1\nUSERIGHT = 1\n\n//Drivestraight PID\nSTRAIGHTP = 1.5\nSTRAIGHTI = 0\nSTRAIGHTD = 0.001\n\n//Drive PID\nDRIVEP = 1.3\nDRIVEI = 0.005\nDRIVED = 0\n\n//Turn PID\nTURNP = 1.7\nTURNI = 0.005\nTURND = 0\n\n//Intake constants\nSUCKMOTORSPEED = -1\nLOADMOTORSPEED = -1\nFORWARDISDOWN = 0 //false\nAIMUPPOWERED = 1 //true\n\n//Shooter constants\nSHOOTEROUTPUTRANGEHIGH = 1\nSHOOTEROUTPUTRANGELOW = -1\nSHOOTERIGAIN = 0.00001\nFLY1DIR = -1\nFLY2DIR = 1\nFLY3DIR = -1\nFLY4DIR = 1\nGRABFRISBEETIME = 0.65\nSHOOTFRISBEETIME = 0.33\nFLYWHEELDEAD = 100\nFLYWHEELMAXSPEED = 3000";
 	
 	final String PARALLELSEPARATOR = ";", CONSTANTSSEPERATOR = "\u001B", YEARSEPERATOR = "~", FIRSTPARAM = ":", SECONDPARAM = "@", THEN = ">";
-	String workingScript, script;
-	String constants;
-	String constantYear;
+	private String workingScript, script, constants, constantYear;
+	private ScriptAssembler assembler;
+
+	private String[] scripts;
+
+	private String[] scriptNames;
+
+	private String selected;
 	
 	/**
-	 * Constructor that takes a workingScript, constants files String, and a year identifier String.
+	 * Constructor that takes a script, constants files String, and a year identifier String.
 	 * @param scriptin the autonomous workingScript String
 	 * @param constantsin the constants file String
 	 * @param thisYear the year identifier String
 	 */
 	public Parser(String scriptin, String constantsin, String thisYear)
 	{
-		script = scriptin;
-		resetScript();
+		assembler = new ScriptAssembler();
 		constantYear = thisYear;
-		constants = retrieveThisYear(constantsin);
+		constants = "";
+		script = "";
+		this.scripts = new String[]{};
+		this.scriptNames = new String[]{};
+		this.selected = "";
+		update(scriptin, constantsin);
+	}
+	
+	public Parser(String scripts[], String scriptNames[], String selected, String constantsin, String thisYear)
+	{
+		assembler = new ScriptAssembler();
+		constantYear = thisYear;
+		constants = "";
+		script = "";
+		this.scripts = new String[]{};
+		this.scriptNames = new String[]{};
+		this.selected = "";
+		update(scripts, scriptNames, selected, constantsin);
 	}
 	
 	public void resetScript()
@@ -273,6 +296,16 @@ public class Parser
 		return script;
 	}
 	
+	public String getSelectedName()
+	{
+		return selected;
+	}
+	
+	public String getSelectedScript()
+	{
+		return assembler.getSelectedScript();
+	}
+	
 	/**
 	 * @return the workingScript
 	 */
@@ -298,6 +331,29 @@ public class Parser
 	{
 		if(!script.equals(scriptin)) System.out.println("Script different");
 		script = scriptin;
+		workingScript = script;
+		String temp = retrieveThisYear(constantsin);
+		if(!temp.equals(constants)) System.out.println("Constants different");
+		constants = temp;
+	}
+	
+	public void update(String[] scripts, String[] scriptNames, String selected, String constantsin)
+	{
+		boolean diff = 	!Arrays.equals(this.scripts, scripts) || !Arrays.equals(this.scriptNames, scriptNames)
+						|| !this.selected.equals(selected);
+		this.scripts = scripts;
+		this.scriptNames = scriptNames;
+		this.selected = selected;
+		if(diff) System.out.println("Script params different");
+		
+		HashMap<String, String> scriptMap = new HashMap<>();
+		for(int i = 0; i < scripts.length; i++)
+		{
+			scriptMap.put(scriptNames[i], scripts[i]);
+		}
+		assembler.update(scriptMap, selected);
+		script = assembler.getAssembled();
+		
 		workingScript = script;
 		String temp = retrieveThisYear(constantsin);
 		if(!temp.equals(constants)) System.out.println("Constants different");

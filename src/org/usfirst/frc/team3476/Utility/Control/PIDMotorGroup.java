@@ -1,5 +1,7 @@
 package org.usfirst.frc.team3476.Utility.Control;
 
+import java.util.Arrays;
+
 import edu.wpi.first.wpilibj.PIDOutput;
 import edu.wpi.first.wpilibj.SpeedController;
 
@@ -42,6 +44,16 @@ public class PIDMotorGroup implements PIDOutput
 		{
 			controllers[i].set(output*dirs[i]);
 		}
+	}
+	
+	public double[] get()
+	{
+		double[] values = new double[controllers.length];
+		for(int i = 0; i < values.length; i++)
+		{
+			values[i] = controllers[i].get()*dirs[i]*(controllers[i].getInverted() ? -1 : 1);
+		}
+		return values;
 	}
 
 }

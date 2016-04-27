@@ -53,4 +53,9 @@ public class ManualHandler
 	{
 		lastManualTime = System.currentTimeMillis() - timeThreshold - 1;
 	}
+	
+	public long getLastInterval()
+	{
+		return System.currentTimeMillis() - lastManualTime;
+	}
 }

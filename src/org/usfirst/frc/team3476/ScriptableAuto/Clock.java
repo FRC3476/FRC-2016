@@ -26,7 +26,7 @@ public class Clock implements Subsystem
 	@Override
 	public String[] getAutoCommands()
 	{
-		return new String[]{"wait", "end"};
+		return new String[]{"wait", "end", "print"};
 	}
 
 	@Override
@@ -41,6 +41,11 @@ public class Clock implements Subsystem
 		if(command.equalsIgnoreCase("end"))
 		{
 			megaEnd();
+			done = true;
+		}
+		if(command.equalsIgnoreCase("print"))
+		{
+			System.out.println("echo " + params[0] + ", " + params[1]);
 			done = true;
 		}
 	}

@@ -1,9 +1,12 @@
 package org.usfirst.frc.team3476.ScriptableAuto;
 
 
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 public class ScriptAssembler
 {
@@ -21,11 +24,20 @@ public class ScriptAssembler
 		this.scripts = new HashMap<String, String>();
 		this.calls = 0;
 	}
-
-
-	public void update(Map<String, String> scripts, String selected)
+	
+	public String getSelectedScript()
 	{
-		this.scripts = scripts;
+		return getScript(selected);
+	}
+	
+	public String getSelectedName()
+	{
+		return selected;
+	}
+
+	public void update(Map<String, String> scriptMap, String selected)
+	{
+		this.scripts = scriptMap;
 		this.selected = selected;
 		assemble();
 	}
@@ -38,18 +50,23 @@ public class ScriptAssembler
 	
 	private String subassemble(String scriptName)
 	{
-		if(calls++ > MAXCALLS)
+		if(calls > MAXCALLS)
 		{
 			throw new IllegalStateException("Too many recursive calls in \"" +
 							selected + "\" at \"" + scriptName + "\" : " + calls);
 		}
 		
-		String script = getScript(scriptName);
+		String script = OrangeUtility.removeSLComments(getScript(scriptName), "//");
 		
 		String[] split = script.split(SUBCALL);
 		String assembling = split[0];
 		
 		String[] pieces = Arrays.copyOfRange(split, 1, split.length);
+		
+		if(pieces.length != 0)//there is a sub-call
+		{
+			calls++;
+		}
 		
 		for(String piece : pieces)
 		{
@@ -72,9 +89,10 @@ public class ScriptAssembler
 	
 	private String getScript(String key)
 	{
-		if(!scripts.containsKey(key))
+		if(!scripts.containsKey(key))//Script params different
 		{
-			throw new IllegalScriptException("Raw script \"" + key + "\" not found in scripts");
+			System.out.println("Raw script \"" + key + "\" not found in scripts\n");
+			return "//script not found";
 		}
 		//contains key, return value
 		return scripts.get(key);

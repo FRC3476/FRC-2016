@@ -55,6 +55,26 @@ public class MedianEncoderPair implements PIDSource
 			return 0;
 		}
 	}
+	
+	public double getRate()
+	{
+		if(useLeft && useRight)
+		{
+			return (left.getRate() + right.getRate())/2;
+		}
+		else if(useLeft)
+		{
+			return left.getRate();
+		}
+		else if(useRight)
+		{
+			return right.getRate();
+		}
+		else
+		{
+			return 0;
+		}
+	}
 
 	@Override
 	public void setPIDSourceType(PIDSourceType pidSource){}

@@ -1,37 +1,28 @@
 package org.usfirst.frc.team3476.Subsystems;
 
-import java.text.Format;
-import java.util.Formatter;
-
 import org.usfirst.frc.team3476.Communications.Dashcomm;
 import org.usfirst.frc.team3476.Main.Subsystem;
-import org.usfirst.frc.team3476.Subsystems.Shooter.LoaderState;
 import org.usfirst.frc.team3476.Utility.DIOHomer;
 import org.usfirst.frc.team3476.Utility.ManualHandler;
 import org.usfirst.frc.team3476.Utility.OrangeUtility;
 import org.usfirst.frc.team3476.Utility.RunningAverage;
 import org.usfirst.frc.team3476.Utility.Control.BangBang;
+import org.usfirst.frc.team3476.Utility.Control.DifferentialGyro;
 import org.usfirst.frc.team3476.Utility.Control.DonutCANTalon;
 import org.usfirst.frc.team3476.Utility.Control.PIDCANTalonEncoderWrapper;
 import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper;
-import org.usfirst.frc.team3476.Utility.Control.TakeBackHalf;
-import org.usfirst.frc.team3476.Utility.Control.PIDDashdataWrapper.Data;
 import org.usfirst.frc.team3476.Utility.DIOHomer.HomeState;
 
 import edu.wpi.first.wpilibj.CANTalon;
-import edu.wpi.first.wpilibj.Counter;
-import edu.wpi.first.wpilibj.CounterBase;
 import edu.wpi.first.wpilibj.DigitalInput;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.PIDController;
-import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
 
 public class Turret implements Subsystem
 {
 	enum AimMode{VISION, ENCODER, SEARCH}
 	
-	private final String[] autoCommands = {"visionaim", "encoderaim", "search", "searchleft", "searchright", "waitforhome"};
+	private final String[] autoCommands = {"visionaim", "encoderaim", "search", "searchleft", "searchright", "waitforhome", "stopaim"};
 	
 	private final String[] constants = {"TURRETENCODERP", "TURRETENCODERI", "TURRETENCODERD",
 										"TURRETENCODERDEAD", "SOFTLIMITS", "USESOFT", "HOMINGDIR",
@@ -46,7 +37,7 @@ public class Turret implements Subsystem
 					FINEERRORTHRESHOLD, FINECLAMP, SEEKCLAMP, SEARCHCLAMP, VISIONSCALE;
 	
 	private int iters, softDir;
-	private boolean softlimitsPassed, resettingSoft, turretdone;
+	private boolean softlimitsPassed, resettingSoft, turretdone, gyrocomp;
 	private double lastaimangle, aimangle;
 	
 	private final double ROTATIONSPERTICK = 2.2379557291666666666666666666667e-5, PIDOUTPUT = 0, FRAMEPERIOD = 110/1000.0;
@@ -61,6 +52,8 @@ public class Turret implements Subsystem
 	
 	private PIDController turretencodercontrol;
 	private PIDCANTalonEncoderWrapper encoder;
+	
+	private DifferentialGyro gyro;
 	
 	private PIDDashdataWrapper vision;
 	private RunningAverage visionavg;
@@ -96,7 +89,11 @@ public class Turret implements Subsystem
 
 	private boolean notfinishedoverride;
 
-	public Turret(DonutCANTalon turretin, DigitalInput halleffectin, PIDDashdataWrapper visionin)
+	private double gyrooffset;
+
+	private double lastgyroget;
+
+	public Turret(DonutCANTalon turretin, DigitalInput halleffectin, PIDDashdataWrapper visionin, DifferentialGyro gyro)
 	{
 		//Turret setup
 		turret = turretin;
@@ -130,6 +127,9 @@ public class Turret implements Subsystem
 		turretencodercontrol.disable();
 		turretencodercontrol.setOutputRange(-PIDOUTPUT, PIDOUTPUT);
 		turretencodercontrol.setToleranceBuffer(100);
+		
+		this.gyro = gyro;
+		gyrocomp = false;
 		
 		//Resetting
 		resetBang = new BangBang(new double[]{0, 0});
@@ -173,6 +173,10 @@ public class Turret implements Subsystem
 			case "waitforhome":
 				waitingforhome = true;
 				break;
+			case "stopaim":
+				stopAim();
+				turretautodone = true;
+				break;
 		}
 	}
 	
@@ -187,6 +191,7 @@ public class Turret implements Subsystem
 		softFlag = false;
 		notfinishedcount = 0;
 		notfinishedoverride = false;
+		gyrocomp = false;
 	}
 
 	@Override
@@ -316,7 +321,7 @@ public class Turret implements Subsystem
 			turret.setClamp(TURRETCLAMP);
 		}
 		
-		BangBang tempBB = new BangBang(new double[]{-RESETSPEED, RESETSPEED});
+		BangBang tempBB = new BangBang(new double[]{-1, 1});
 		
 		if(!tempBB.equals(resetBang))
 		{
@@ -394,15 +399,10 @@ public class Turret implements Subsystem
 							visionthrowawaycount = 0;
 						}
 					}
+					
 					switch(aimmode)
 					{
 						case VISION:
-							//If first exec, make sure we're using the right control
-							/*if(lastturretdone)
-							{
-								turretencodercontrol.disable();
-								turretvisioncontrol.enable();
-							}*/
 							
 							if(vision.targetAvailable())
 							{
@@ -491,7 +491,7 @@ public class Turret implements Subsystem
 												{
 													if(!turretautodone)
 													{
-														System.out.println("VISION DONE");
+														System.out.println("VISION DONE\nVision error: " + avgval);
 													}
 													visiondone = true;
 												}
@@ -540,10 +540,6 @@ public class Turret implements Subsystem
 							
 						case SEARCH:
 						case ENCODER:
-							if(aimmode == AimMode.ENCODER)
-							{
-								turret.setClamp(TURRETCLAMP);
-							}
 							//If first exec, make sure we're using the right control
 							//System.out.println("Lastturretdone: " + lastturretdone);
 							if(!searchdone)
@@ -555,10 +551,25 @@ public class Turret implements Subsystem
 							String print = "";
 							
 							//Rectify the angle - finds softlimit problems - sets resettingSoft and softFlag
-							if(lastaimangle != aimangle)
+							if(aimmode != AimMode.VISION)
 							{
-								rectifyangle = enc + rectifyAngle(aimangle, enc);
-								setpointDiff = true;
+								if(gyrocomp)
+								{
+									if(lastaimangle != aimangle || (gyro.get() != lastgyroget))
+									{
+										rectifyangle = enc + rectifyAngle(aimangle - (gyro.get() + gyrooffset)/360, enc);
+										setpointDiff = true;
+									}
+									lastgyroget = gyro.get();
+								}
+								else
+								{
+									if(lastaimangle != aimangle)
+									{
+										rectifyangle = enc + rectifyAngle(aimangle, enc);
+										setpointDiff = true;
+									}
+								}
 							}
 							
 							timereport += "rectifychk: " + (System.nanoTime() - startTime) + "\n";
@@ -569,10 +580,10 @@ public class Turret implements Subsystem
 							{
 								if(softFlag)
 								{
-									print += "360 noscope: " + rectifyangle + "\n";
+									print += "360 noscope\n";
 									turretencodercontrol.reset();//disables as well
 									resetBang.setSetpoint(rectifyangle);
-									turret.setClamp(0.75);
+									turret.setClamp(RESETSPEED);
 									turretencodercontrol.setSetpoint(rectifyangle);
 									softFlag = false;
 								}
@@ -589,11 +600,19 @@ public class Turret implements Subsystem
 							if(resettingSoft)
 							{
 								turret.set(resetBang.output(enc));
+								//if(iters % 50 == 0) System.out.println("turret.get(): " + turret.get());
 								//System.out.println("RESETDEAD: " + RESETDEAD + ", Error: " + resetBang.getError(enc));
 								if(Math.abs(resetBang.getError(enc)) < RESETDEAD)
 								{
 									turretencodercontrol.enable();
 									resettingSoft = false;
+								}
+							}
+							else
+							{
+								if(aimmode == AimMode.ENCODER)
+								{
+									turret.setClamp(TURRETCLAMP);
 								}
 							}
 							
@@ -764,14 +783,24 @@ public class Turret implements Subsystem
 		return searching;
 	}
 	
-	public synchronized double getTurretSet()
+	public double getTurretSet()
 	{
 		return turretencodercontrol.getSetpoint();
+	}
+	
+	public double getCurrentGyroPos()
+	{
+		return (gyro.get() + gyrooffset)/360;
 	}
 	
 	public PIDDashdataWrapper getVisionWrapper()
 	{
 		return vision;
+	}
+	
+	public boolean isVisionTracking()
+	{
+		return aimmode == AimMode.VISION;
 	}
 	
 	public void printPID()
@@ -816,20 +845,39 @@ public class Turret implements Subsystem
 	 */
 	public synchronized void aim()
 	{
-		turretdone = false;
+		resetState();
 		aimmode = AimMode.VISION;
+		gyrocomp = false;
 		visionMode = VisionMode.SEEK;
 	}
 	
 	/**
-	 * Aims the turret to the specified angle.
+	 * Aims the turret to the specified angle relative to the robot.
 	 * @param angle the angle to turn to
 	 */
 	public synchronized void aim(double angle)
 	{
-		turretdone = false;
+		resetState();
 		aimmode = AimMode.ENCODER;
+		gyrocomp = false;
 		encodermove(angle);
+	}
+	
+	/**
+	 * Aims the turret to the specified angle relative to the field.
+	 * @param angle the angle to turn to
+	 */
+	public synchronized void gyroAim(double angle)
+	{
+		resetState();
+		aimmode = AimMode.ENCODER;
+		gyrocomp = true;
+		encodermove(angle);
+	}
+	
+	public synchronized void setGyroOffset(double gyrooffset)
+	{
+		this.gyrooffset = gyrooffset;
 	}
 	
 	private synchronized void encodermove(double angle)
@@ -952,6 +1000,16 @@ public class Turret implements Subsystem
 		return turret;
 	}
 	
+	public double getLocalAngle()
+	{
+		return convertAngleLocal(encoder.getDistance(), -0.5, 0.5);
+	}
+	
+	public boolean isLocalAngleinRange(double a, double b)
+	{
+		return OrangeUtility.inRange(getLocalAngle(), a, b);
+	}
+	
 	public void resetHomer()
 	{
 		turretHomer.restart();
@@ -969,6 +1027,7 @@ public class Turret implements Subsystem
 	 */
 	public synchronized void stopAim()
 	{
+		resetState();
 		turretdone = true;
 	}
 	

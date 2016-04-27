@@ -74,6 +74,34 @@ public class OrangeUtility
 		return toNormalize*factor + add;
 	}
 	
+	public static void conditionalPIDdisable(PIDController controller)
+	{
+		if(controller.isEnabled())
+		{
+			controller.disable();
+		}
+	}
+	
+	public static void conditionalPIDenable(PIDController controller)
+	{
+		if(!controller.isEnabled())
+		{
+			controller.enable();
+		}
+	}
+	
+	public static void conditionalPID_able(PIDController controller, boolean enable)
+	{
+		if(enable)
+		{
+			conditionalPIDenable(controller);
+		}
+		else
+		{
+			conditionalPIDdisable(controller);
+		}
+	}
+	
 	/**
 	 * Checks  if it is legal to start a thread.
 	 * @param testing the Thread to test
@@ -316,6 +344,11 @@ public class OrangeUtility
 	public static boolean doubleEqual(double a, double b)
 	{
 		double epsilon = 1E-14;
+		return Math.abs(a-b) < epsilon;
+	}
+	
+	public static boolean doubleEqual(double a, double b, double epsilon)
+	{
 		return Math.abs(a-b) < epsilon;
 	}
 }

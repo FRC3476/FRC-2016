@@ -1,6 +1,9 @@
 package org.usfirst.frc.team3476.Subsystems;
 
+import java.util.Arrays;
+
 import org.usfirst.frc.team3476.Main.Subsystem;
+import org.usfirst.frc.team3476.Utility.OrangeUtility;
 
 import edu.wpi.first.wpilibj.CANTalon;
 
@@ -46,10 +49,36 @@ public class Watcher implements Subsystem
 				CANTalon turret = ((Turret)systems[1]).getTurretMotor();
 				System.out.println("turretMotor: " + turret.get());
 			}
-			if(true)
+			if(false)
 			{
 				Shooter shooter = (Shooter)systems[2];
 				System.out.println("Shooter setpoint: " + shooter.getFlySet());
+			}
+			if(true)
+			{
+				Shooter shooter = (Shooter)systems[2];
+				double[] get = shooter.getMotorGroup().get();
+				double attempt = shooter.getShooterPID().get(),
+						actual = 0;
+				for(double d : get)
+				{
+					actual += d;
+				}
+				actual /= get.length;
+				if(!OrangeUtility.doubleEqual(attempt, actual, 1E-2))
+				{
+					System.out.println("ERROR Flyatt: " + attempt + " Flyact: " + actual);
+				}
+			}
+			if(true)
+			{
+				Intake intake = (Intake)systems[3];
+				double actual = intake.getIntake(),
+						attempt = intake.getLastIntakeVal();
+				if(!OrangeUtility.doubleEqual(attempt, actual, 1E-2))
+				{
+					System.out.println("ERROR Intatt: " + attempt + " Intact: " + actual);
+				}
 			}
 		}
 	}

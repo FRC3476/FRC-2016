@@ -49,6 +49,10 @@ public class Intake implements Subsystem
 
 	private boolean hasDropdownSet;
 
+	private boolean invertdropdownenc;
+
+	private double lastintakeval;
+
 	public Intake(SpeedController intake1in, SpeedController intake2in, CANTalon ddmotorin, PowerDistributionPanel pdPanelin)
 	{
 		pdPanel = pdPanelin;
@@ -69,6 +73,7 @@ public class Intake implements Subsystem
 		ddController.setToleranceBuffer(6);
 		stopdd = false;
 		homed = false;
+		invertdropdownenc = false;
 		
 		//Manuals
 		ddManual = new ManualHandler(MANUALTIMEOUT);
@@ -100,8 +105,7 @@ public class Intake implements Subsystem
 		{
 			System.out.println("intaking " + params[0] + " at " + params[1] + "percent");
 			//Direction(sign(possibly 0)), percent speed, constant to invert if necessary and make timing correct
-			intake1.set(params[0]*params[1]*SUCKMOTORSPEED/100);
-			intake2.set(params[0]*params[1]*LOADMOTORSPEED/100);
+			setIntake(params[0]*params[1]/100);
 			done = true;
 		}
 		else if(command.equalsIgnoreCase("dropdown"))
@@ -331,6 +335,16 @@ public class Intake implements Subsystem
 		return ddController.getSetpoint();
 	}
 	
+	public double getIntake()
+	{
+		return (intake1.get() + intake2.get())/2;
+	}
+	
+	public double getLastIntakeVal()
+	{
+		return lastintakeval;
+	}
+	
 	public void stopDD()
 	{
 		stopdd = true;
@@ -339,6 +353,11 @@ public class Intake implements Subsystem
 	public boolean intakeRunning()
 	{
 		return intake1.get() != 0 || intake2.get() != 0;
+	}
+	
+	public synchronized void dropdownEncoderInverted(boolean inverted)
+	{
+		invertdropdownenc = inverted;
 	}
 	
 	public void printPID()
@@ -360,7 +379,7 @@ public class Intake implements Subsystem
 	{
 		stopdd = false;
 		hasDropdownSet = true;
-		ddPosition = position;
+		ddPosition = (invertdropdownenc ? -1 : 1)*position;
 	}
 	
 	public void manualIntake(double speed)
@@ -369,8 +388,13 @@ public class Intake implements Subsystem
 		setIntake(speed);
 	}
 	
-	private void setIntake(double speed)
+	private synchronized void setIntake(double speed)
 	{
+		if(speed != lastintakeval && speed == 0)
+		{
+			System.out.println("INTAKE ZERO");
+		}
+		lastintakeval = speed*SUCKMOTORSPEED;
 		intake1.set(speed*SUCKMOTORSPEED*INTAKE1DIR);
 		intake2.set(speed*SUCKMOTORSPEED*INTAKE2DIR);
 	}
@@ -416,8 +440,7 @@ public class Intake implements Subsystem
 	public void end()
 	{
 		//setIntakeMovement(DDdir.STOP);
-		intake1.set(0);
-		intake2.set(0);
+		setIntake(0);
 	}
 	
 	@Override
