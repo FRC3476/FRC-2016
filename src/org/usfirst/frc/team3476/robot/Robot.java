@@ -171,8 +171,8 @@ public class Robot extends IterativeRobot
     	
     	loaderSwitch.setInverted(false);
     	
-    	intake1.setInverted(false);
-    	intake2.setInverted(false);
+    	intake1.setInverted(true);
+    	intake2.setInverted(true);
     	
     	tach.setSamplesToAverage(4);
     	spiGyro.calibrate();
@@ -201,7 +201,7 @@ public class Robot extends IterativeRobot
 		systems[2] = new Shooter(	flyTalon1, flyTalon2, loaderTalon, (Turret)systems[1], tach,
 									loaderSwitch, vision, hood);
 		systems[3] = new Intake(intake1, intake2, ddmotor, pdp);
-		systems[4] = new Miscellaneous(pressure, hookRelease, winch);
+		systems[4] = new Miscellaneous(pressure, hookRelease, winch, pdp);
 		systems[8] = new Watcher(systems, 10);
 		systems[9] = new Clock(systems);
 		
@@ -212,7 +212,7 @@ public class Robot extends IterativeRobot
 		//misc init
 		((Clock)systems[9]).megaEnd();
 		((Drive)systems[0]).autoShifting(false);
-		((Intake)systems[3]).dropdownEncoderInverted(true);
+		((Intake)systems[3]).dropdownEncoderInverted(false);
 		((Miscellaneous)systems[4]).climberEnable(true);
     	
     	if(!autodropdown)
@@ -239,13 +239,16 @@ public class Robot extends IterativeRobot
 	public void autonomousInit()
     {
     	first = true;
+    	//System.out.println("Autonomous Init");
     }
-    
+
+    boolean startedAuto = false;
     /**
      * This function is called periodically during autonomous.
      */
     public void autonomousPeriodic()
     {
+    	//System.out.println("Autonomous Peridoic Start");
     	if(starter.importantDone() && first)//WE ARE REEADY TO RUMMMMMMBLEEEEEEE and it's the first time
     	{
     		//DO THINGS
@@ -261,9 +264,11 @@ public class Robot extends IterativeRobot
     		
     		Dashcomm.put("match/enabled", true);
     		setMatchInfo(true);
+    		startedAuto = true;
     	}
     	
-    	if(Timer.getMatchTime() > 15.0) main.stop();
+    	//System.out.println("Autonomous Init Before Timer");
+    	//if(Timer.getMatchTime() > 15.0) main.stop();
     }
 	
 	@Override
@@ -311,6 +316,10 @@ public class Robot extends IterativeRobot
 		System.out.println("teleopInit");
     	first = true;
     	joysetpoint = 0;
+    	if (startedAuto) {
+    		main.stop();
+    		startedAuto = false;
+    	}
     }
 
     /**
@@ -318,6 +327,11 @@ public class Robot extends IterativeRobot
      */
     public void teleopPeriodic()
     {
+//    	System.out.print("Total Current: ");
+//    	System.out.println(pdp.getTotalCurrent());
+//    	System.out.print("Battery Voltage: ");
+//    	System.out.println(pdp.getVoltage());
+    	
     	int joyPOV = joy.getPOV(0);
     	int xboxPOV = xbox.getPOV(0);
     	if(starter.importantDone())//WE ARE REEADY TO RUMMMMMMBLEEEEEEE

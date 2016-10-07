@@ -5,6 +5,7 @@ import org.usfirst.frc.team3476.Main.Subsystem;
 import org.usfirst.frc.team3476.Subsystems.Shooter.LoaderState;
 
 import edu.wpi.first.wpilibj.AnalogInput;
+import edu.wpi.first.wpilibj.PowerDistributionPanel;
 import edu.wpi.first.wpilibj.Solenoid;
 import edu.wpi.first.wpilibj.SpeedController;
 import edu.wpi.first.wpilibj.Timer;
@@ -36,11 +37,15 @@ public class Miscellaneous implements Subsystem
 
 	private boolean stopWinch;
 	private boolean lastwinchback;
+	private PowerDistributionPanel pdPanel;
+	private int iters;
 	
-	public Miscellaneous(AnalogInput pressureSensor, Solenoid hookRelease, SpeedController winch)
+	public Miscellaneous(AnalogInput pressureSensor, Solenoid hookRelease, SpeedController winch, PowerDistributionPanel pdPanel)
 	{
 		this.pressureSensor = pressureSensor;
 		pressure = 0;
+		
+		this.pdPanel = pdPanel;
 		
 		this.hookRelease = hookRelease;
 		this.winch = winch;
@@ -53,7 +58,7 @@ public class Miscellaneous implements Subsystem
 		startClimb = false;
 		climbergo = false;
 		
-		task = new SubsystemTask(this, 25);//x ms minimum exec time
+		task = new SubsystemTask(this, 15);//x ms minimum exec time
 		miscellaneousThread = new Thread(task, "miscellaneousThread");
 		miscellaneousThread.start();
 	}
@@ -94,6 +99,8 @@ public class Miscellaneous implements Subsystem
 	public void update()
 	{
 		boolean winchback = Dashcomm.get("data/misc/resetting", false);
+		Dashcomm.put("data/misc/resettingcheck", winchback);
+		
 		if(climbergo)
 		{
 			switch(climberState)
@@ -128,9 +135,6 @@ public class Miscellaneous implements Subsystem
 					if(startWinch)
 					{
 						climberState = ClimberState.WINCHING;
-						hookTimer.stop();
-						winchTimer.reset();
-						winchTimer.start();
 					}
 					
 					if(!winchback && lastwinchback)
@@ -172,6 +176,11 @@ public class Miscellaneous implements Subsystem
 					startWinch = false;
 					reset = false;
 					stopWinch = false;
+					
+					if(iters % 4 == 0)
+					{
+						System.out.println("Winch current: " + pdPanel.getCurrent(3));
+					}
 					break;
 					
 					//unused
@@ -192,6 +201,7 @@ public class Miscellaneous implements Subsystem
 			}//end state switch
 		}//end climbergo
 		lastwinchback = winchback;
+		iters++;
 	}
 	
 	private synchronized void setWinch(boolean on, boolean winchback)
